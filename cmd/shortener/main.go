@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,7 +10,7 @@ import (
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", requestHandler)
-
+	// mux.HandleFunc("/{id}", handleItem)
 	err := http.ListenAndServe(":8080", mux)
 
 	if err != nil {
@@ -49,9 +48,9 @@ func postReqHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	fmt.Printf("body = %s\n", body)
 
-	encoded := base64.RawURLEncoding.EncodeToString([]byte(body))
-	fmt.Println(encoded)
+	// encoded := base64.RawURLEncoding.EncodeToString([]byte(body))
+	// fmt.Println(encoded)
 
-	w.Write([]byte("http://localhost:8080/" + encoded))
+	w.Write([]byte(body))
 
 }
