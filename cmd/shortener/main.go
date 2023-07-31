@@ -24,7 +24,7 @@ func handleItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(307)
 	w.Header().Set("Location", id)
 
-	fmt.Printf("You requested item with ID: %s", id)
+	// fmt.Printf("You requested item with ID: %s", id)
 
 }
 
