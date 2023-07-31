@@ -21,10 +21,10 @@ func main() {
 func handleItem(w http.ResponseWriter, r *http.Request) {
 
 	id := strings.TrimPrefix(r.URL.Path, "/")
-
+	w.WriteHeader(307)
 	w.Header().Set("Location", id)
-	w.WriteHeader(http.StatusTemporaryRedirect)
-	// fmt.Printf("You requested item with ID: %s", id)
+
+	fmt.Printf("You requested item with ID: %s", id)
 
 }
 
