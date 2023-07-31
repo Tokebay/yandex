@@ -21,7 +21,8 @@ func main() {
 func handleItem(w http.ResponseWriter, r *http.Request) {
 
 	id := strings.TrimPrefix(r.URL.Path, "/")
-	w.WriteHeader(307)
+	// w.WriteHeader(307)
+	w.Header().Set("StatusCode", "307")
 	w.Header().Set("Location", id)
 
 	// fmt.Printf("You requested item with ID: %s", id)
