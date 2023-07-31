@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 )
 
 func main() {
@@ -20,10 +19,10 @@ func main() {
 
 func handleItem(w http.ResponseWriter, r *http.Request) {
 
-	id := strings.TrimPrefix(r.URL.Path, "/")
-	// w.WriteHeader(307)
-	w.Header().Set("StatusCode", "307")
-	w.Header().Set("Location", id)
+	// id := strings.TrimPrefix(r.URL.Path, "/")
+	w.WriteHeader(307)
+	// w.Header().Set("StatusCode", "307")
+	w.Header().Set("Location", r.URL.Path)
 
 	// fmt.Printf("You requested item with ID: %s", id)
 
