@@ -1,12 +1,11 @@
 package main
 
 import (
-	"math/rand"
+	"encoding/base64"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
-	"time"
-
-	bs "github.com/catinello/base62"
 )
 
 func main() {
@@ -26,7 +25,7 @@ func handleItem(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", id)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-	// fmt.Fprintf(w, "You requested item with ID: %s", id)
+	// fmt.Printf("You requested item with ID: %s", id)
 
 }
 
@@ -47,9 +46,12 @@ func postReqHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(201)
 	w.Header().Set("Content-type", "text/plain")
 
-	rand.Seed(time.Now().UnixNano())
+	body, _ := io.ReadAll(r.Body)
+	fmt.Printf("body = %s\n", body)
 
-	encode := (bs.Encode(rand.Intn(99999999999)))
-	w.Write([]byte("http://localhost:8080/" + encode))
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(body))
+	fmt.Println(encoded)
+
+	w.Write([]byte("http://localhost:8080/" + encoded))
 
 }
