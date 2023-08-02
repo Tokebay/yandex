@@ -3,54 +3,87 @@ package main
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
+	"strings"
+
+	"github.com/gorilla/mux"
 )
 
+const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+type URLShortener struct {
+	mapping map[string]string
+}
+
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", requestHandler)
-	// mux.HandleFunc("/{id}", handleItem)
-	err := http.ListenAndServe(":8080", mux)
+	shortener := &URLShortener{
+		mapping: make(map[string]string),
+	}
 
+	router := mux.NewRouter()
+	router.HandleFunc("/", shortener.shortenURLHandler).Methods(http.MethodPost)
+	router.HandleFunc("/{id}", shortener.redirectURLHandler).Methods(http.MethodGet)
+
+	fmt.Println("Server is running on http://localhost:8080")
+	http.Handle("/", router)
+	http.ListenAndServe(":8080", nil)
+}
+
+func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	url, err := io.ReadAll(r.Body)
 	if err != nil {
-		panic(err)
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
 	}
+
+	// Генерируем случайный идентификатор для сокращения URL
+	id := us.generateID()
+	shortenedURL := "http://localhost:8080/" + id
+
+	us.mapping[id] = string(url)
+
+	fmt.Printf("Original URL: %s\n", url)
+	fmt.Printf("Shortened URL: %s\n", shortenedURL)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
+	_, _ = w.Write([]byte(shortenedURL))
 }
 
-func handleItem(w http.ResponseWriter, r *http.Request) {
-
-	// id := strings.TrimPrefix(r.URL.Path, "/")
-	w.WriteHeader(307)
-	// w.Header().Set("StatusCode", "307")
-	w.Header().Set("Location", r.URL.Path)
-
-	// fmt.Printf("You requested item with ID: %s", id)
-
-}
-
-func requestHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		handleItem(w, r)
-	case "POST":
-		postReqHandler(w, r)
-	default:
-		w.WriteHeader(400)
+func (us *URLShortener) redirectURLHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/")
+	originalURL, ok := us.mapping[id]
+	if !ok {
+		http.Error(w, "URL not found", http.StatusBadRequest)
+		return
+	}
+
+	// Выполняем перенаправление на оригинальный URL
+	w.Header().Set("Location", originalURL)
+	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func postReqHandler(w http.ResponseWriter, r *http.Request) {
+func (us *URLShortener) generateID() string {
+	base := len(base62Alphabet)
+	var idBuilder strings.Builder
 
-	r.Header.Add("Content-type", "text/plain")
-	w.WriteHeader(201)
-	w.Header().Set("Content-type", "text/plain")
+	// Генерируем случайный идентификатор из 6 символов
+	for i := 0; i < 6; i++ {
+		index := rand.Intn(base)
+		idBuilder.WriteByte(base62Alphabet[index])
+	}
 
-	body, _ := io.ReadAll(r.Body)
-	fmt.Printf("body = %s\n", body)
-
-	// encoded := base64.RawURLEncoding.EncodeToString([]byte(body))
-	// fmt.Println(encoded)
-
-	w.Write([]byte(body))
-
+	return idBuilder.String()
 }
