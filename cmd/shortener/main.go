@@ -13,7 +13,13 @@ import (
 const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type URLShortener struct {
-	mapping map[string]string
+	mapping        map[string]string
+	generateIDFunc func() string
+}
+
+// Метод для установки функции генерации идентификатора
+func (us *URLShortener) SetGenerateIDFunc(fn func() string) {
+	us.generateIDFunc = fn
 }
 
 func main() {
@@ -76,6 +82,10 @@ func (us *URLShortener) redirectURLHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (us *URLShortener) generateID() string {
+	if us.generateIDFunc != nil {
+		return us.generateIDFunc()
+	}
+
 	base := len(base62Alphabet)
 	var idBuilder strings.Builder
 
