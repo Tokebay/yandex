@@ -32,7 +32,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 	type want struct {
 		contentType string
 		statusCode  int
-		shortUrl    string
+		shortURL    string
 	}
 	tests := []struct {
 		name    string
@@ -45,7 +45,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			want: want{
 				contentType: "text/plain",
 				statusCode:  201,
-				shortUrl:    "http://localhost:8080/EwHXdJfB",
+				shortURL:    "http://localhost:8080/EwHXdJfB",
 			},
 		},
 	}
@@ -63,7 +63,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			// получаем и проверяем тело запроса
 			defer res.Body.Close()
 			bodyContent := w.Body.String()
-			assert.Equal(t, tt.want.shortUrl, bodyContent)
+			assert.Equal(t, tt.want.shortURL, bodyContent)
 
 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
 

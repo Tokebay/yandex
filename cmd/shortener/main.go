@@ -57,9 +57,9 @@ func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request
 	fmt.Printf("Original URL: %s\n", url)
 	fmt.Printf("Shortened URL: %s\n", shortenedURL)
 
-	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
+	w.WriteHeader(http.StatusCreated)
 	_, _ = w.Write([]byte(shortenedURL))
 }
 
