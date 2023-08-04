@@ -110,6 +110,8 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 			shortener.redirectURLHandler(w, request)
 
 			res := w.Result()
+			defer res.Body.Close()
+
 			// Проверяем статус-код
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 			// Получаем и проверяем заголовок Location
