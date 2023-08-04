@@ -70,3 +70,50 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 		})
 	}
 }
+
+// GET /EwHXdJfB HTTP/1.1
+// Host: localhost:8080
+// Content-Type: text/plain
+
+// HTTP/1.1 307 Temporary Redirect
+// Location: https://practicum.yandex.ru/
+
+func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
+	shortener := &URLShortener{
+		mapping: make(map[string]string),
+	}
+	// Добавляем соответствующую запись в mapping перед вызовом хэндлера
+	shortener.mapping["EwHXdJfB"] = "https://practicum.yandex.ru/"
+
+	type want struct {
+		statusCode  int
+		originalURL string
+	}
+	tests := []struct {
+		name    string
+		request string
+		want    want
+	}{
+		{
+			name:    "redirectURL",
+			request: "http://localhost:8080/EwHXdJfB",
+			want: want{
+				statusCode:  307,
+				originalURL: "https://practicum.yandex.ru/",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
+			w := httptest.NewRecorder()
+			shortener.redirectURLHandler(w, request)
+
+			res := w.Result()
+			// Проверяем статус-код
+			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+			// Получаем и проверяем заголовок Location
+			assert.Equal(t, tt.want.originalURL, res.Header.Get("Location"))
+		})
+	}
+}
