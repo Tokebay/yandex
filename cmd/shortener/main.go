@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -27,13 +27,12 @@ func main() {
 		mapping: make(map[string]string),
 	}
 
-	router := mux.NewRouter()
-	router.HandleFunc("/", shortener.shortenURLHandler).Methods(http.MethodPost)
-	router.HandleFunc("/{id}", shortener.redirectURLHandler).Methods(http.MethodGet)
+	r := chi.NewRouter()
+	r.Post("/", shortener.shortenURLHandler)
+	r.Get("/{id}", shortener.redirectURLHandler)
 
 	fmt.Println("Server is running on http://localhost:8080")
-	http.Handle("/", router)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", r)
 }
 
 func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +59,10 @@ func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
 	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(shortenedURL))
+	_, err = w.Write([]byte(shortenedURL))
+	if err != nil {
+		fmt.Printf("Возникла ошибка %s", err)
+	}
 }
 
 func (us *URLShortener) redirectURLHandler(w http.ResponseWriter, r *http.Request) {

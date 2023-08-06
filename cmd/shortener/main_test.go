@@ -9,16 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// POST / HTTP/1.1
-// Host: localhost:8080
-// Content-Type: text/plain
-// https://practicum.yandex.ru/
-
-// HTTP/1.1 201 Created
-// Content-Type: text/plain
-// Content-Length: 30
-// http://localhost:8080/EwHXdJfB
-
 func TestURLShortener_shortenURLHandler(t *testing.T) {
 	shortener := &URLShortener{
 		mapping: make(map[string]string),
