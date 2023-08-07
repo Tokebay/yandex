@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Tokebay/yandex/config"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -23,6 +24,8 @@ func (us *URLShortener) SetGenerateIDFunc(fn func() string) {
 }
 
 func main() {
+	cfg := config.ParseFlags()
+
 	shortener := &URLShortener{
 		mapping: make(map[string]string),
 	}
@@ -31,8 +34,12 @@ func main() {
 	r.Post("/", shortener.shortenURLHandler)
 	r.Get("/{id}", shortener.redirectURLHandler)
 
-	fmt.Println("Server is running on http://localhost:8080")
-	http.ListenAndServe(":8080", r)
+	fmt.Printf("baseUrl %s\n", cfg.BaseURL)
+
+	serverAddress := cfg.ServerAddress
+
+	fmt.Printf("Server is running on http://%s\n", serverAddress)
+	http.ListenAndServe(serverAddress, r)
 }
 
 func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +68,7 @@ func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
-		fmt.Printf("Возникла ошибка %s", err)
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
 }
 
