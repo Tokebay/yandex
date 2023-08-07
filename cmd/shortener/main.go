@@ -16,6 +16,7 @@ const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123
 type URLShortener struct {
 	mapping        map[string]string
 	generateIDFunc func() string
+	config         *config.Config
 }
 
 // Метод для установки функции генерации идентификатора
@@ -28,6 +29,7 @@ func main() {
 
 	shortener := &URLShortener{
 		mapping: make(map[string]string),
+		config:  cfg,
 	}
 
 	r := chi.NewRouter()
@@ -47,7 +49,7 @@ func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
+	cfg := us.config
 	url, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusInternalServerError)
@@ -56,7 +58,7 @@ func (us *URLShortener) shortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	// Генерируем случайный идентификатор для сокращения URL
 	id := us.generateID()
-	shortenedURL := "http://localhost:8080/" + id
+	shortenedURL := cfg.BaseURL + "/" + id
 
 	us.mapping[id] = string(url)
 
