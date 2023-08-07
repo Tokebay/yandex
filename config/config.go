@@ -22,7 +22,7 @@ func (c *Config) ParseEnv() {
 	if serverAddress := os.Getenv("SERVER_ADDRESS"); serverAddress != "" {
 		c.ServerAddress = "localhost:8080"
 	}
-	if baseUrl := os.Getenv("BASE_URL"); baseUrl != "" {
+	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
 		c.BaseURL = "http://localhost:8080"
 	}
 }
