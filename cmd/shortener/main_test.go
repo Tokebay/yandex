@@ -6,12 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Tokebay/yandex/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestURLShortener_shortenURLHandler(t *testing.T) {
+
 	shortener := &URLShortener{
 		mapping: make(map[string]string),
+		config:  &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"},
 	}
 
 	// Устанавливаем функцию генерации идентификатора для тестов
@@ -60,13 +63,6 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 		})
 	}
 }
-
-// GET /EwHXdJfB HTTP/1.1
-// Host: localhost:8080
-// Content-Type: text/plain
-
-// HTTP/1.1 307 Temporary Redirect
-// Location: https://practicum.yandex.ru/
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	shortener := &URLShortener{
