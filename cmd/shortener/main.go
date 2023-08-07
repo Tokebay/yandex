@@ -26,6 +26,7 @@ func (us *URLShortener) SetGenerateIDFunc(fn func() string) {
 
 func main() {
 	cfg := config.ParseFlags()
+	cfg.ParseEnv()
 
 	shortener := &URLShortener{
 		mapping: make(map[string]string),
