@@ -34,7 +34,7 @@ func (ms *MapStorage) GetURL(id string) (string, error) {
 	defer ms.mu.RUnlock()
 
 	url, ok := ms.mapping[id]
-	// fmt.Printf("get url %s\n", url)
+
 	if !ok {
 		return "", errors.New("Url not found")
 	}
