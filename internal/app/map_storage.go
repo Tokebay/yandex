@@ -36,7 +36,7 @@ func (ms *MapStorage) GetURL(id string) (string, error) {
 	url, ok := ms.mapping[id]
 
 	if !ok {
-		return "", errors.New("Url not found")
+		return "", errors.New("url not found")
 	}
 	return url, nil
 }
