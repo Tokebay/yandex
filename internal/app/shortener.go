@@ -102,7 +102,6 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
 	}
-
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
@@ -115,7 +114,6 @@ func (us *URLShortener) GenerateID() string {
 
 	base := len(base62Alphabet)
 	var idBuilder strings.Builder
-
 	// Генерируем случайный идентификатор из 6 символов
 	for i := 0; i < 6; i++ {
 		index := rand.Intn(base)
