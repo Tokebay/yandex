@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/Tokebay/yandex/config"
+	"github.com/Tokebay/yandex/internal/app"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestURLShortener_shortenURLHandler(t *testing.T) {
 
-	shortener := &URLShortener{
-		mapping: make(map[string]string),
-		config:  &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"},
-	}
+	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
+	storage := *app.NewMapStorage()
+	shortener := *app.NewURLShortener(cfg, &storage)
 
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
@@ -48,7 +48,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", requestBody)
 			// создаём новый Recorder
 			w := httptest.NewRecorder()
-			shortener.shortenURLHandler(w, request)
+			shortener.ShortenURLHandler(w, request)
 
 			res := w.Result()
 			//check status code
@@ -57,7 +57,6 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			defer res.Body.Close()
 			bodyContent := w.Body.String()
 			assert.Equal(t, tt.want.shortURL, bodyContent)
-
 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
 
 		})
@@ -65,11 +64,14 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 }
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
-	shortener := &URLShortener{
-		mapping: make(map[string]string),
-	}
-	// Добавляем соответствующую запись в mapping перед вызовом хэндлера
-	shortener.mapping["EwHXdJfB"] = "https://practicum.yandex.ru/"
+	storage := app.NewMapStorage()
+
+	shortener := app.NewURLShortener(
+		&config.Config{},
+		storage,
+	)
+
+	storage.SaveURL("EwHXdJfB", "https://practicum.yandex.ru/")
 
 	type want struct {
 		statusCode  int
@@ -93,7 +95,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
 			w := httptest.NewRecorder()
-			shortener.redirectURLHandler(w, request)
+			shortener.RedirectURLHandler(w, request)
 
 			res := w.Result()
 			defer res.Body.Close()

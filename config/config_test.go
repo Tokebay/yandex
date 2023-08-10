@@ -16,7 +16,7 @@ func TestParseFlags(t *testing.T) {
 	os.Args = []string{"test", "-a", "testaddress", "-b", "testurl"}
 
 	// Вызываем функцию ParseFlags() и проверяем, что получили ожидаемые значения
-	cfg := ParseFlags()
+	cfg := NewConfig()
 
 	assert.Equal(t, "testaddress", cfg.ServerAddress)
 	assert.Equal(t, "testurl", cfg.BaseURL)
