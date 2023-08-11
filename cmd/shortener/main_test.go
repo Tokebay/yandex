@@ -51,7 +51,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			shortener.ShortenURLHandler(w, request)
 
 			res := w.Result()
-			//check status code
+			// проверяем статус код
 			assert.Equal(t, res.StatusCode, tt.want.statusCode)
 			// получаем и проверяем тело запроса
 			defer res.Body.Close()
