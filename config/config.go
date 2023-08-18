@@ -16,6 +16,7 @@ func NewConfig() *Config {
 	config := &Config{}
 	flag.StringVar(&config.ServerAddress, "a", "localhost", "HTTP server address")
 	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
+	flag.IntVar(&config.ServerPort, "p", 8080, "HTTP server port")
 
 	flag.Parse()
 	config.parseEnv()
