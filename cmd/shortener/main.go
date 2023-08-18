@@ -6,22 +6,30 @@ import (
 
 	"github.com/Tokebay/yandex/config"
 	"github.com/Tokebay/yandex/internal/app"
-	"github.com/go-chi/chi/v5"
+
+	logger "github.com/Tokebay/yandex/internal/logger"
+	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
 func main() {
+	logger.Initialize("info")
+
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
 	shortener := app.NewURLShortener(cfg, storage)
 
 	r := chi.NewRouter()
+	r.Use(logger.LoggerMiddleware)
+
 	r.Post("/", shortener.ShortenURLHandler)
 	r.Get("/{id}", shortener.RedirectURLHandler)
 
-	fmt.Printf("baseUrl %s\n", cfg.BaseURL)
+	addr := fmt.Sprintf("%s:%d", cfg.ServerAddress, cfg.ServerPort)
+	logger.Log.Info("Server is starting", zap.String("address", addr))
 
-	serverAddress := cfg.ServerAddress
-
-	fmt.Printf("Server is running on http://%s\n", serverAddress)
-	http.ListenAndServe(serverAddress, r)
+	err := http.ListenAndServe(addr, r)
+	if err != nil {
+		logger.Log.Fatal("Failed to start server", zap.Error(err))
+	}
 }

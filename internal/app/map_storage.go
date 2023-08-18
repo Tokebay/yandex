@@ -26,6 +26,7 @@ func (ms *MapStorage) SaveURL(id, url string) error {
 	defer ms.mu.Unlock()
 
 	ms.mapping[id] = url
+
 	return nil
 }
 

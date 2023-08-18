@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -13,7 +14,7 @@ type Config struct {
 
 func NewConfig() *Config {
 	config := &Config{}
-	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "HTTP server address")
+	flag.StringVar(&config.ServerAddress, "a", "localhost", "HTTP server address")
 	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
 
 	flag.Parse()
@@ -31,6 +32,11 @@ func (c *Config) parseEnv() {
 	}
 
 	if serverPort := os.Getenv("SERVER_PORT"); serverPort != "" {
-		c.ServerPort = 8080 // Значение по умолчанию, если серверный порт не установлен
+		port, err := strconv.Atoi(serverPort)
+		if err == nil {
+			c.ServerPort = port
+		}
+	} else {
+		c.ServerPort = 8080 // Установка значения по умолчанию
 	}
 }

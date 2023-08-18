@@ -12,30 +12,6 @@ import (
 
 const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func EncodeBase62(n int) string {
-	if n == 0 {
-		return string(base62Alphabet[0])
-	}
-
-	result := ""
-	base := len(base62Alphabet)
-	for n > 0 {
-		remainder := n % base
-		result = string(base62Alphabet[remainder]) + result
-		n /= base
-	}
-	return result
-}
-
-func DecodeBase62(s string) int {
-	base := len(base62Alphabet)
-	result := 0
-	for _, char := range s {
-		result = result*base + strings.IndexRune(base62Alphabet, char)
-	}
-	return result
-}
-
 type URLShortener struct {
 	generateIDFunc func() string
 	config         *config.Config
@@ -97,11 +73,14 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	id := strings.TrimPrefix(r.URL.Path, "/")
+	fmt.Printf("Received id: %s\n", id)
+
 	originalURL, err := us.storage.GetURL(id)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
 	}
+
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
