@@ -25,7 +25,7 @@ func main() {
 	r.Post("/", shortener.ShortenURLHandler)
 	r.Get("/{id}", shortener.RedirectURLHandler)
 
-	addr := fmt.Sprintf("%s:%d", cfg.ServerAddress, cfg.ServerPort)
+	addr := fmt.Sprintf("%s", cfg.ServerAddress)
 	logger.Log.Info("Server is starting", zap.String("address", addr))
 
 	err := http.ListenAndServe(addr, r)
