@@ -73,7 +73,7 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	id := strings.TrimPrefix(r.URL.Path, "/")
-	fmt.Printf("Received id: %s\n", id)
+	// fmt.Printf("Received id: %s\n", id)
 
 	originalURL, err := us.storage.GetURL(id)
 	if err != nil {
