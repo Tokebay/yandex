@@ -73,7 +73,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 	}
-	return
 }
 
 func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
