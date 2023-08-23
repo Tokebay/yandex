@@ -32,7 +32,7 @@ func run() error {
 
 	r.Post("/", shortener.ShortenURLHandler)
 	r.Get("/{id}", shortener.RedirectURLHandler)
-	r.Post("/api/shorten", shortener.ApiShortenerURL)
+	r.Post("/api/shorten", shortener.APIShortenerURL)
 
 	addr := cfg.ServerAddress
 	logger.Log.Info("Server is starting", zap.String("address", addr))

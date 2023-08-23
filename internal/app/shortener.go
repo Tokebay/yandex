@@ -32,7 +32,7 @@ func NewURLShortener(cfg *config.Config, storage URLStorage) *URLShortener {
 	}
 }
 
-func (us *URLShortener) ApiShortenerURL(w http.ResponseWriter, r *http.Request) {
+func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

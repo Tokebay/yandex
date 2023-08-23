@@ -99,7 +99,7 @@ func TestApiShortenerURL(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBuffer(tt.requestBody))
 			// создаём новый Recorder
 			w := httptest.NewRecorder()
-			shortener.ApiShortenerURL(w, request)
+			shortener.APIShortenerURL(w, request)
 
 			res := w.Result()
 			// проверяем статус код
