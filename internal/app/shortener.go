@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Tokebay/yandex/config"
+	"github.com/Tokebay/yandex/internal/models"
 )
 
 const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -28,6 +30,50 @@ func NewURLShortener(cfg *config.Config, storage URLStorage) *URLShortener {
 		config:  cfg,
 		storage: storage,
 	}
+}
+
+func (us *URLShortener) ApiShortenerURL(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req models.Request
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		http.Error(w, "Error decoding JSOn", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+	url := req.URL
+
+	id := us.GenerateID()
+	cfg := us.config
+	shortenedURL := cfg.BaseURL + "/" + id
+
+	err := us.storage.SaveURL(id, url)
+	if err != nil {
+		http.Error(w, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
+
+	resp := models.Response{
+		Result: shortenedURL,
+	}
+	jsonData, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, "Error creating JSON response", http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	// fmt.Println(jsonData)
+	_, err = w.Write(jsonData)
+	if err != nil {
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
+	return
 }
 
 func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +119,6 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	id := strings.TrimPrefix(r.URL.Path, "/")
-	// fmt.Printf("Received id: %s\n", id)
 
 	originalURL, err := us.storage.GetURL(id)
 	if err != nil {

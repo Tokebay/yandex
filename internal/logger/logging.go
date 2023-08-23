@@ -10,24 +10,27 @@ import (
 var Log *zap.Logger
 
 func Initialize(level string) error {
+	// Преобразование строки уровня логирования в объект zap.AtomicLevel
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
 		return err
 	}
-	// lvl.UnmarshalText([]byte(level))
-
+	//Создание конфигурации логгера в режиме "production".
 	cfg := zap.NewProductionConfig()
+	//Установка уровня логирования для конфигурации.
 	cfg.Level = lvl
-
+	// Построение логгера на основе конфигурации.
 	zl, err := cfg.Build()
 	if err != nil {
 		panic(err)
 	}
-
+	// Присваивание построенного логгера переменной Log.
 	Log = zl
 
 	return nil
 }
+
+// логирования запросов и ответов на уровне HTTP-обработчиков
 func LoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
@@ -52,12 +55,12 @@ type responseLogger struct {
 	contentLength int
 }
 
-func (l *responseLogger) WriteHeader(code int) {
-	l.statusCode = code
-	l.ResponseWriter.WriteHeader(code)
+func (rl *responseLogger) WriteHeader(code int) {
+	rl.statusCode = code
+	rl.ResponseWriter.WriteHeader(code)
 }
 
-func (l *responseLogger) Write(data []byte) (int, error) {
-	l.contentLength = len(data)
-	return l.ResponseWriter.Write(data)
+func (rl *responseLogger) Write(data []byte) (int, error) {
+	rl.contentLength = len(data)
+	return rl.ResponseWriter.Write(data)
 }

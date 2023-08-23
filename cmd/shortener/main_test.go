@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -59,6 +60,55 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			assert.Equal(t, tt.want.shortURL, bodyContent)
 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
 
+		})
+	}
+}
+
+func TestApiShortenerURL(t *testing.T) {
+	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
+	storage := *app.NewMapStorage()
+	shortener := *app.NewURLShortener(cfg, &storage)
+
+	shortener.SetGenerateIDFunc(func() string {
+		return "EwHXdJfB"
+	})
+
+	type want struct {
+		contentType  string
+		statusCode   int
+		expectedBody string
+	}
+	tests := []struct {
+		name        string
+		requestBody []byte
+		want        want
+	}{
+		{
+			name:        "ApiShortenerURL",
+			requestBody: []byte(`{ "url": "https://practicum.yandex.ru"}`),
+
+			want: want{
+				contentType:  "application/json",
+				statusCode:   201,
+				expectedBody: `{"result":"http://localhost:8080/EwHXdJfB"}`,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBuffer(tt.requestBody))
+			// создаём новый Recorder
+			w := httptest.NewRecorder()
+			shortener.ApiShortenerURL(w, request)
+
+			res := w.Result()
+			// проверяем статус код
+			assert.Equal(t, res.StatusCode, tt.want.statusCode)
+			// получаем и проверяем тело запроса
+			defer res.Body.Close()
+			bodyContent := w.Body.String()
+			assert.Equal(t, tt.want.expectedBody, bodyContent)
+			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
 		})
 	}
 }
