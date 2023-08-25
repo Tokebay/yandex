@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/Tokebay/yandex/config"
-	"github.com/Tokebay/yandex/internal/app"
 
+	"github.com/Tokebay/yandex/internal/app"
 	logger "github.com/Tokebay/yandex/internal/logger"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -21,6 +21,7 @@ func main() {
 func run() error {
 	//Инициализируется логгер
 	logger.Initialize("info")
+
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
 	shortener := app.NewURLShortener(cfg, storage)
@@ -29,6 +30,7 @@ func run() error {
 	r := chi.NewRouter()
 	// промежуточное ПО (middleware) для логирования. перед каждым запросом будет выполнена функция logger.LoggerMiddleware
 	r.Use(logger.LoggerMiddleware)
+	r.Use(app.GzipMiddleware)
 
 	r.Post("/", shortener.ShortenURLHandler)
 	r.Get("/{id}", shortener.RedirectURLHandler)

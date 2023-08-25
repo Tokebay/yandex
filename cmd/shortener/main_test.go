@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -115,7 +117,6 @@ func TestApiShortenerURL(t *testing.T) {
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
-
 	shortener := app.NewURLShortener(
 		&config.Config{},
 		storage,
@@ -155,5 +156,76 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 			// Получаем и проверяем заголовок Location
 			assert.Equal(t, tt.want.originalURL, res.Header.Get("Location"))
 		})
+	}
+}
+
+func TestGzipCompression(t *testing.T) {
+
+	cfg := &config.Config{
+		ServerAddress: "localhost:8080",
+		BaseURL:       "http://localhost:8080",
+	}
+	storage := *app.NewMapStorage()
+	shortener := *app.NewURLShortener(cfg, &storage)
+
+	shortener.SetGenerateIDFunc(func() string {
+		return "EwHXdJfB"
+	})
+
+	type want struct {
+		contentType             string
+		statusCode              int
+		expectedBody            string
+		expectedContentEncoding string
+	}
+	tests := []struct {
+		name           string
+		requestBody    []byte
+		acceptEncoding string
+		want           want
+	}{
+		{
+			name:           "send_gzip",
+			requestBody:    []byte(`{ "url": "https://practicum.yandex.ru"}`),
+			acceptEncoding: "gzip",
+			want: want{
+				contentType:             "application/json",
+				statusCode:              201,
+				expectedBody:            `{"result":"http://localhost:8080/EwHXdJfB"}`,
+				expectedContentEncoding: "gzip",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write(tt.requestBody)
+			})
+			req := httptest.NewRequest("POST", cfg.BaseURL, nil)
+			req.Header.Set("Accept-Encoding", tt.acceptEncoding)
+
+			recorder := httptest.NewRecorder()
+			app.GzipMiddleware(handler).ServeHTTP(recorder, req)
+
+			resp := recorder.Result()
+			assert.Equal(t, tt.acceptEncoding, resp.Header.Get("Content-Encoding"))
+
+			if strings.Contains(tt.want.expectedContentEncoding, "gzip") {
+				gzReader, err := gzip.NewReader(resp.Body)
+				assert.NoError(t, err)
+
+				uncompressedData := new(bytes.Buffer)
+				_, err = uncompressedData.ReadFrom(gzReader)
+				assert.NoError(t, err)
+
+				assert.Equal(t, tt.requestBody, []byte(uncompressedData.String()))
+			} else {
+				body, err := io.ReadAll(resp.Body)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.requestBody, string(body))
+			}
+
+		})
+
 	}
 }

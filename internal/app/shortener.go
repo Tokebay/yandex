@@ -41,7 +41,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	var req models.Request
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
-		http.Error(w, "Error decoding JSOn", http.StatusBadRequest)
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
@@ -60,7 +60,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	resp := models.Response{
 		Result: shortenedURL,
 	}
-	jsonData, err := json.Marshal(resp)
+	jsonData, err := json.Marshal(&resp)
 	if err != nil {
 		http.Error(w, "Error creating JSON response", http.StatusInternalServerError)
 	}
@@ -68,7 +68,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	// fmt.Println(jsonData)
 	_, err = w.Write(jsonData)
 	if err != nil {
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
