@@ -14,7 +14,7 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		if strings.Contains(acceptEncoding, "gzip") {
 			w.Header().Set("Content-Encoding", "gzip")
 
-			// Создаем новый Gzip Writer для записи сжатых данных
+			// Создаем Gzip Writer для записи сжатых данных
 			gz := gzip.NewWriter(w)
 			defer gz.Close()
 

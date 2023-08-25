@@ -203,29 +203,26 @@ func TestGzipCompression(t *testing.T) {
 			})
 			req := httptest.NewRequest("POST", cfg.BaseURL, nil)
 			req.Header.Set("Accept-Encoding", tt.acceptEncoding)
-
 			recorder := httptest.NewRecorder()
 			app.GzipMiddleware(handler).ServeHTTP(recorder, req)
-
 			resp := recorder.Result()
 			assert.Equal(t, tt.acceptEncoding, resp.Header.Get("Content-Encoding"))
 
 			if strings.Contains(tt.want.expectedContentEncoding, "gzip") {
 				gzReader, err := gzip.NewReader(resp.Body)
+				resp.Body.Close()
 				assert.NoError(t, err)
 
 				uncompressedData := new(bytes.Buffer)
 				_, err = uncompressedData.ReadFrom(gzReader)
 				assert.NoError(t, err)
 
-				assert.Equal(t, tt.requestBody, []byte(uncompressedData.String()))
+				assert.Equal(t, tt.requestBody, []byte(uncompressedData.Bytes()))
 			} else {
 				body, err := io.ReadAll(resp.Body)
 				assert.NoError(t, err)
 				assert.Equal(t, tt.requestBody, string(body))
 			}
-
 		})
-
 	}
 }
