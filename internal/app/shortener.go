@@ -35,7 +35,7 @@ func NewURLShortener(cfg *config.Config, storage URLStorage) *URLShortener {
 func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	var req models.Request
@@ -53,7 +53,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 
 	err := us.storage.SaveURL(id, url)
 	if err != nil {
-		http.Error(w, "Error saving URL", http.StatusInternalServerError)
+		http.Error(w, "error saving URL", http.StatusInternalServerError)
 		return
 	}
 
@@ -62,7 +62,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	}
 	jsonData, err := json.Marshal(&resp)
 	if err != nil {
-		http.Error(w, "Error creating JSON response", http.StatusInternalServerError)
+		http.Error(w, "error creating JSON response", http.StatusInternalServerError)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -70,21 +70,21 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 
 	_, err = w.Write(jsonData)
 	if err != nil {
-		http.Error(w, "Error writing response", http.StatusInternalServerError)
+		http.Error(w, "error writing response", http.StatusInternalServerError)
 	}
 }
 
 func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	cfg := us.config
 	url, err := io.ReadAll(r.Body)
-	defer r.Body.Close() // закрыл тело запроса
+	defer r.Body.Close()
 
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
 	}
 
@@ -106,7 +106,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
-		return // возврат из функции после обработки ошибки
+		return
 	}
 }
 

@@ -26,10 +26,11 @@ func run() error {
 	storage := app.NewMapStorage()
 	shortener := app.NewURLShortener(cfg, storage)
 
-	// новый маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
+	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
 	// промежуточное ПО (middleware) для логирования. перед каждым запросом будет выполнена функция logger.LoggerMiddleware
 	r.Use(logger.LoggerMiddleware)
+	// middleware проверяет поддержку сжатия gzip
 	r.Use(app.GzipMiddleware)
 
 	r.Post("/", shortener.ShortenURLHandler)
