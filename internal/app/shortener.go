@@ -104,6 +104,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(shortenedURL))
+
 	if err != nil {
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 		return

@@ -2,7 +2,6 @@ package app
 
 import (
 	"compress/gzip"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -16,7 +15,7 @@ func GzipMiddleware(next http.Handler) http.Handler {
 
 		if supportsGzip {
 			w.Header().Set("Content-Encoding", "gzip")
-			fmt.Printf("acceptEncoding %s\n", acceptEncoding)
+
 			// Создаем Gzip Writer для записи сжатых данных
 			gz := gzip.NewWriter(w)
 			defer gz.Close()

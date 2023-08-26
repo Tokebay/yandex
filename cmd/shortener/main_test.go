@@ -36,7 +36,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 		want    want
 	}{
 		{
-			name:    "ShortenUrl",
+			name:    "POST_ShortenUrl",
 			request: "https://practicum.yandex.ru/",
 			want: want{
 				contentType: "text/plain",
@@ -58,8 +58,9 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 			assert.Equal(t, res.StatusCode, tt.want.statusCode)
 			// получаем и проверяем тело запроса
 			defer res.Body.Close()
-			bodyContent := w.Body.String()
-			assert.Equal(t, tt.want.shortURL, bodyContent)
+			bodyContent, err := io.ReadAll(res.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want.shortURL, string(bodyContent))
 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
 
 		})
@@ -86,7 +87,7 @@ func TestApiShortenerURL(t *testing.T) {
 		want        want
 	}{
 		{
-			name:        "ApiShortenerURL",
+			name:        "JSON_ApiShortenerURL",
 			requestBody: []byte(`{ "url": "https://practicum.yandex.ru"}`),
 
 			want: want{
@@ -134,7 +135,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 		want    want
 	}{
 		{
-			name:    "redirectURL",
+			name:    "RedirectURL",
 			request: "http://localhost:8080/EwHXdJfB",
 			want: want{
 				statusCode:  307,
