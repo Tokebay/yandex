@@ -124,14 +124,6 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
 	}
-	// Выводим отладочную информацию о статус-коде и заголовках ответа
-	fmt.Printf("Debug: Status Code: %d\n", http.StatusTemporaryRedirect)
-	fmt.Println("Debug: Response Headers:")
-	for key, values := range w.Header() {
-		for _, value := range values {
-			fmt.Printf("  %s: %s\n", key, value)
-		}
-	}
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
