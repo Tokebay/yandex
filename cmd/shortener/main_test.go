@@ -129,7 +129,10 @@ func TestApiShortenerURL(t *testing.T) {
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
 	var cfg *config.Config
-	fileStorage, _ := app.NewProducer(cfg.FileStoragePath)
+	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
 	shortener := app.NewURLShortener(
 		&config.Config{},
 		storage,
