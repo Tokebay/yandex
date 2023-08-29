@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +18,12 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 
 	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
 	storage := *app.NewMapStorage()
-	shortener := *app.NewURLShortener(cfg, &storage)
+	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fileStorage.Close()
+	shortener := *app.NewURLShortener(cfg, &storage, fileStorage)
 
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
@@ -69,7 +75,12 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 func TestApiShortenerURL(t *testing.T) {
 	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
 	storage := *app.NewMapStorage()
-	shortener := *app.NewURLShortener(cfg, &storage)
+	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fileStorage.Close()
+	shortener := *app.NewURLShortener(cfg, &storage, fileStorage)
 
 	shortener.SetGenerateIDFunc(func() string {
 		return "EwHXdJfB"
@@ -117,9 +128,13 @@ func TestApiShortenerURL(t *testing.T) {
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
+	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
+
+	fileStorage, _ := app.NewProducer(cfg.FileStoragePath)
 	shortener := app.NewURLShortener(
 		&config.Config{},
 		storage,
+		fileStorage,
 	)
 
 	storage.SaveURL("EwHXdJfB", "https://practicum.yandex.ru/")

@@ -6,7 +6,10 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Tokebay/yandex/config"
 	"github.com/Tokebay/yandex/internal/models"
@@ -18,6 +21,41 @@ type URLShortener struct {
 	generateIDFunc func() string
 	config         *config.Config
 	storage        URLStorage
+	fileStorage    *Producer
+	uuidCounter    int // счетчик UUID
+	uuidMu         sync.Mutex
+}
+
+type URLData struct {
+	UUID        int    `json:"uuid"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
+func (us *URLShortener) LoadURLsFromFile() error {
+	file, err := os.Open(us.config.FileStoragePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	for {
+		var urlData URLData
+		if err := decoder.Decode(&urlData); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		// восстанов. URL в хранилище storage
+		if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Метод для установки функции генерации идентификатора
@@ -25,10 +63,20 @@ func (us *URLShortener) SetGenerateIDFunc(fn func() string) {
 	us.generateIDFunc = fn
 }
 
-func NewURLShortener(cfg *config.Config, storage URLStorage) *URLShortener {
+func (us *URLShortener) GenerateUUID() int {
+	us.uuidMu.Lock()
+	defer us.uuidMu.Unlock()
+
+	us.uuidCounter++
+	return us.uuidCounter
+}
+
+func NewURLShortener(cfg *config.Config, storage URLStorage, fileStorage *Producer) *URLShortener {
 	return &URLShortener{
-		config:  cfg,
-		storage: storage,
+		config:      cfg,
+		storage:     storage,
+		fileStorage: fileStorage,
+		uuidCounter: 0,
 	}
 }
 
@@ -38,6 +86,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	var req models.Request
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
@@ -54,6 +103,19 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	err := us.storage.SaveURL(id, url)
 	if err != nil {
 		http.Error(w, "error saving URL", http.StatusInternalServerError)
+		return
+	}
+
+	uuid := us.GenerateUUID()
+	// Сохраняем данные в файловое хранилище
+	urlData := &URLData{
+		UUID:        uuid,
+		ShortURL:    shortenedURL,
+		OriginalURL: url,
+	}
+
+	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
 	}
 
@@ -97,6 +159,18 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
+	uuid := us.GenerateUUID()
+	// Сохраняем данные в файловое хранилище
+	urlData := &URLData{
+		UUID:        uuid,
+		ShortURL:    shortenedURL,
+		OriginalURL: string(url),
+	}
+
+	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
+		return
+	}
 
 	fmt.Printf("Original URL: %s\n", url)
 	fmt.Printf("Shortened URL: %s\n", shortenedURL)
@@ -122,6 +196,19 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	originalURL, err := us.storage.GetURL(id)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
+		return
+	}
+
+	// Сохраняем информацию о перенаправлении в файловое хранилище
+	uuid := us.GenerateUUID()
+	urlData := &URLData{
+		UUID:        uuid,
+		ShortURL:    r.URL.Path,
+		OriginalURL: originalURL,
+	}
+
+	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
 	}
 	// Выполняем перенаправление на оригинальный URL

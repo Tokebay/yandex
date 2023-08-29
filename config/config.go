@@ -8,19 +8,23 @@ import (
 )
 
 type Config struct {
-	ServerAddress string
-	BaseURL       string
-	ServerPort    int
+	ServerAddress   string
+	BaseURL         string
+	ServerPort      int
+	FileStoragePath string
 }
 
 func NewConfig() *Config {
 	config := &Config{}
+	config.parseEnv()
+
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "HTTP server address")
 	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
 	flag.IntVar(&config.ServerPort, "p", 8080, "HTTP server port")
+	flag.StringVar(&config.FileStoragePath, "f", "tmp/shorturldb.json", "Path to FILE_STORAGE_PATH")
 
 	flag.Parse()
-	config.parseEnv()
+
 	return config
 }
 
@@ -39,5 +43,10 @@ func (c *Config) parseEnv() {
 		if err == nil {
 			c.ServerPort = port
 		}
+	}
+
+	if envFilePath := os.Getenv("FILE_STORAGE_PATH "); envFilePath != "" {
+		fmt.Println("envFilePath ", envFilePath)
+		c.FileStoragePath = envFilePath
 	}
 }

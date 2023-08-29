@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/Tokebay/yandex/config"
@@ -24,7 +25,19 @@ func run() error {
 
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
-	shortener := app.NewURLShortener(cfg, storage)
+
+	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fileStorage.Close()
+
+	shortener := app.NewURLShortener(cfg, storage, fileStorage)
+
+	err = shortener.LoadURLsFromFile()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
@@ -42,7 +55,7 @@ func run() error {
 	logger.Log.Info("Server is starting", zap.String("address", addr))
 
 	// Запускается HTTP-сервер, который начинает прослушивание указанного адреса addr и использует маршрутизатор r для обработки запросов.
-	err := http.ListenAndServe(addr, r)
+	err = http.ListenAndServe(addr, r)
 	if err != nil {
 		logger.Log.Fatal("Failed to start server", zap.Error(err))
 	}
