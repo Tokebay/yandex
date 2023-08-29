@@ -128,8 +128,7 @@ func TestApiShortenerURL(t *testing.T) {
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
-	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
-
+	var cfg *config.Config
 	fileStorage, _ := app.NewProducer(cfg.FileStoragePath)
 	shortener := app.NewURLShortener(
 		&config.Config{},
