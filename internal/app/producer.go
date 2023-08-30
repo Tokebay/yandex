@@ -2,8 +2,8 @@ package app
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Producer struct {
@@ -11,13 +11,19 @@ type Producer struct {
 	encoder *json.Encoder
 }
 
-func NewProducer(fileName string) (*Producer, error) {
+func NewProducer(filePath string) (*Producer, error) {
 
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	dir := filepath.Dir(filePath)
+	// fmt.Printf("dir: %s\n", dir)
+	err := os.MkdirAll(dir, 0755) //create the directory and give it required permissions
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("fileName %s \n", fileName)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
+	// fmt.Printf("filePath %s \n", filePath)
 
 	return &Producer{
 		file:    file,
