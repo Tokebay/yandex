@@ -19,7 +19,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 	cfg := &config.Config{
 		ServerAddress:   "localhost:8080",
 		BaseURL:         "http://localhost:8080",
-		FileStoragePath: "/tmp/shorturldb.json",
+		FileStoragePath: "tmp/short-url-db.json.json",
 	}
 	storage := *app.NewMapStorage()
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
@@ -27,7 +27,10 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := *app.NewURLShortener(cfg, &storage, fileStorage)
+	shortener, err := app.NewURLShortener(cfg, &storage, fileStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
@@ -80,7 +83,7 @@ func TestApiShortenerURL(t *testing.T) {
 	cfg := &config.Config{
 		ServerAddress:   "localhost:8080",
 		BaseURL:         "http://localhost:8080",
-		FileStoragePath: "/tmp/shorturldb.json",
+		FileStoragePath: "tmp/short-url-db.json.json",
 	}
 	storage := *app.NewMapStorage()
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
@@ -88,7 +91,7 @@ func TestApiShortenerURL(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := *app.NewURLShortener(cfg, &storage, fileStorage)
+	shortener, err := app.NewURLShortener(cfg, &storage, fileStorage)
 
 	shortener.SetGenerateIDFunc(func() string {
 		return "EwHXdJfB"
@@ -137,7 +140,7 @@ func TestApiShortenerURL(t *testing.T) {
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
 	cfg := &config.Config{
-		FileStoragePath: "/tmp/shorturldb.json",
+		FileStoragePath: "tmp/short-url-db.json.json",
 	}
 
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
@@ -145,12 +148,14 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	shortener := app.NewURLShortener(
+	shortener, err := app.NewURLShortener(
 		&config.Config{},
 		storage,
 		fileStorage,
 	)
-
+	if err != nil {
+		log.Fatal(err)
+	}
 	storage.SaveURL("EwHXdJfB", "https://practicum.yandex.ru/")
 
 	type want struct {
