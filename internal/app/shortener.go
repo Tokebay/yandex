@@ -71,7 +71,7 @@ func (us *URLShortener) GenerateUUID() int {
 	return us.uuidCounter
 }
 
-func NewURLShortener(cfg *config.Config, storage URLStorage, fileStorage *Producer) (*URLShortener, error) {
+func NewURLShortener(cfg *config.Config, storage URLStorage, fileStorage *Producer) *URLShortener {
 	us := &URLShortener{
 		config:      cfg,
 		storage:     storage,
@@ -79,11 +79,7 @@ func NewURLShortener(cfg *config.Config, storage URLStorage, fileStorage *Produc
 		uuidCounter: 0,
 	}
 
-	// Загрузка URL из файла
-	if err := us.LoadURLsFromFile(); err != nil {
-		return nil, err
-	}
-	return us, nil
+	return us
 }
 
 func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) {
