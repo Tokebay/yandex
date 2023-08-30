@@ -16,7 +16,11 @@ import (
 
 func TestURLShortener_shortenURLHandler(t *testing.T) {
 
-	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
+	cfg := &config.Config{
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "/tmp/shorturldb.json",
+	}
 	storage := *app.NewMapStorage()
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
@@ -73,7 +77,11 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 }
 
 func TestApiShortenerURL(t *testing.T) {
-	cfg := &config.Config{ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
+	cfg := &config.Config{
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "/tmp/shorturldb.json",
+	}
 	storage := *app.NewMapStorage()
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
@@ -128,11 +136,15 @@ func TestApiShortenerURL(t *testing.T) {
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
-	var cfg *config.Config
+	cfg := &config.Config{
+		FileStoragePath: "/tmp/shorturldb.json",
+	}
+
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	shortener := app.NewURLShortener(
 		&config.Config{},
 		storage,
