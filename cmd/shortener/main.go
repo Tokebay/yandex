@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/Tokebay/yandex/config"
 
@@ -27,9 +26,7 @@ func run() error {
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
 
-	fPath := strings.TrimLeft(cfg.FileStoragePath, "/")
-	fmt.Printf("path to fileStorage %s \n", fPath)
-	fileStorage, err := app.NewProducer(fPath)
+	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatal(err)
 	}

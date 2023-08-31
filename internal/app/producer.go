@@ -17,20 +17,22 @@ type Producer struct {
 
 func NewProducer(filePath string) (*Producer, error) {
 
-	fmt.Printf("dirPath %s \n", filePath)
-	splitDir := strings.Split(filePath, "/")
-	dirName := splitDir[0]
-	fmt.Printf("dirName %s\n", dirName)
-
-	err := os.MkdirAll(dirName, 0755)
+	// fmt.Printf("dirPath %s \n", filePath)
+	// splitDir := strings.Split(filePath, "/")
+	// dirName := splitDir[0]
+	fmt.Printf("dirName %s\n", filepath.Base(filepath.Dir(filePath)))
+	dir := filepath.Base(filepath.Dir(filePath))
+	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err
 	}
 
-	fileName := filepath.Base(filepath.Clean(filePath))
+	// fileName := filepath.Base(filepath.Clean(filePath))
+	fileName := strings.TrimLeft(filePath, "/")
 	fmt.Println("fileName ", fileName)
 	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
+		fmt.Printf("err %s", err)
 		return nil, err
 	}
 
@@ -48,8 +50,9 @@ func (p *Producer) WriteEvent(urlData *URLData) error {
 }
 
 func (p *Producer) Flush() error {
-
-	file, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	filePath := strings.TrimLeft(p.filePath, "/")
+	fmt.Printf("p.Name %s\n", filePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return err
 	}

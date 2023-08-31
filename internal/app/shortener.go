@@ -39,12 +39,13 @@ func (us *URLShortener) LoadURLsFromFile() error {
 	dir, _ := filepath.Split(us.config.FileStoragePath)
 	dirName := filepath.Base(filepath.Clean(dir))
 	fileName := filepath.Base(filepath.Clean(us.config.FileStoragePath))
-	fmt.Printf("dir %s; fName %s\n", dirName, fileName)
+	trimDir := strings.TrimLeft(us.config.FileStoragePath, "/")
+	fmt.Printf("dir %s; fName %s; dir %s\n", dirName, fileName, trimDir)
 
 	// fullPath := dirName + "/" + fileName
-	file, err := os.Open(fileName)
+	file, err := os.Open(trimDir)
 	if err != nil {
-		fmt.Printf("Error load file %s \n", err)
+		// fmt.Printf("Error load file %s \n", err)
 		return err
 	}
 	defer file.Close()
