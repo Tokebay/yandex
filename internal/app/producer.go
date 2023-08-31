@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -26,8 +27,9 @@ func NewProducer(filePath string) (*Producer, error) {
 		return nil, err
 	}
 
-	// fmt.Println("filePath ", filePath)
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	fileName := filepath.Base(filepath.Clean(filePath))
+	fmt.Println("fileName ", fileName)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +48,7 @@ func (p *Producer) WriteEvent(urlData *URLData) error {
 }
 
 func (p *Producer) Flush() error {
-	// return p.encoder.Encode(&p.buffer)
+
 	file, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return err
