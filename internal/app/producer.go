@@ -43,17 +43,21 @@ func (p *Producer) WriteEvent(urlData *URLData) error {
 
 func (p *Producer) Flush() error {
 	// return p.encoder.Encode(&p.buffer)
-	file, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	file, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Encode and write the entire slice to the file
-	err = json.NewEncoder(file).Encode(p.buffer)
-	if err != nil {
-		return err
+	// Encode and append the buffer contents to the file
+	encoder := json.NewEncoder(file)
+	for _, urlData := range p.buffer {
+		if err := encoder.Encode(urlData); err != nil {
+			return err
+		}
 	}
+
+	p.buffer = nil
 
 	return nil
 }

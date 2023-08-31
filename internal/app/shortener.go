@@ -37,25 +37,27 @@ func (us *URLShortener) LoadURLsFromFile() error {
 
 	file, err := os.Open(us.config.FileStoragePath)
 	if err != nil {
+		fmt.Printf("Error load file %s \n", err)
 		return err
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
-	var urlDataSlice []URLData
+	var urlDataSlice URLData
 	err = decoder.Decode(&urlDataSlice)
 	if err != nil && !errors.Is(err, io.EOF) {
 		fmt.Printf("не смогли декодировать слайс %s \n", err)
 		return err
 	}
 
-	for _, urlData := range urlDataSlice {
-		// восстанов. URL в хранилище storage
-		if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
-			fmt.Printf("не смогли восстановить данные из файла %s \n", err)
-			return err
-		}
+	// for _, urlData := range urlDataSlice {
+	var urlData URLData
+	// восстанов. URL в хранилище storage
+	if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
+		fmt.Printf("не смогли восстановить данные из файла %s \n", err)
+		return err
 	}
+	// }
 
 	return nil
 }
