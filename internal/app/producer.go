@@ -16,9 +16,10 @@ type Producer struct {
 
 func NewProducer(filePath string) (*Producer, error) {
 
+	fmt.Printf("dirPath %s \n", filePath)
 	splitDir := strings.Split(filePath, "/")
 	dirName := splitDir[0]
-	// fmt.Printf("dirName %s\n", dirName)
+	fmt.Printf("dirName %s\n", dirName)
 
 	err := os.MkdirAll(dirName, 0755)
 	if err != nil {
