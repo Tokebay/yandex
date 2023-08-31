@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +36,8 @@ type URLData struct {
 }
 
 func LoadURLsFromFile(filePath string, us *URLShortener) error {
-	file, err := os.Open(filePath)
+	fileName := filepath.Base(filepath.Clean(filePath))
+	file, err := os.Open(fileName)
 	if err != nil {
 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
 		return err
