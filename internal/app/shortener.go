@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +36,13 @@ type URLData struct {
 
 func (us *URLShortener) LoadURLsFromFile() error {
 
-	file, err := os.Open(us.config.FileStoragePath)
+	dir, _ := filepath.Split(us.config.FileStoragePath)
+	dirName := filepath.Base(filepath.Clean(dir))
+	fileName := filepath.Base(filepath.Clean(us.config.FileStoragePath))
+	fmt.Printf("dir %s; fName %s\n", dirName, fileName)
+
+	fullPath := dirName + "/" + fileName
+	file, err := os.Open(fullPath)
 	if err != nil {
 		fmt.Printf("Error load file %s \n", err)
 		return err
@@ -46,7 +53,7 @@ func (us *URLShortener) LoadURLsFromFile() error {
 	var urlDataSlice URLData
 	err = decoder.Decode(&urlDataSlice)
 	if err != nil && !errors.Is(err, io.EOF) {
-		fmt.Printf("не смогли декодировать слайс %s \n", err)
+		fmt.Printf("не смогли декодировать слайс %s\n", err)
 		return err
 	}
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 )
 
 type Producer struct {
@@ -16,17 +16,20 @@ type Producer struct {
 
 func NewProducer(filePath string) (*Producer, error) {
 
-	dir := filepath.Dir(filePath)
-	// fmt.Printf("dir: %s\n", dir)
-	err := os.MkdirAll(dir, 0755)
+	splitDir := strings.Split(filePath, "/")
+	dirName := splitDir[0]
+	// fmt.Printf("dirName %s\n", dirName)
+
+	err := os.MkdirAll(dirName, 0755)
 	if err != nil {
 		return nil, err
 	}
+
+	// fmt.Println("filePath ", filePath)
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("filePath %s \n", filePath)
 
 	return &Producer{
 		file:     file,
