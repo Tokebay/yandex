@@ -41,8 +41,8 @@ func (us *URLShortener) LoadURLsFromFile() error {
 	fileName := filepath.Base(filepath.Clean(us.config.FileStoragePath))
 	fmt.Printf("dir %s; fName %s\n", dirName, fileName)
 
-	fullPath := dirName + "/" + fileName
-	file, err := os.Open(fullPath)
+	// fullPath := dirName + "/" + fileName
+	file, err := os.Open(fileName)
 	if err != nil {
 		fmt.Printf("Error load file %s \n", err)
 		return err
