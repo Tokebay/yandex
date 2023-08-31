@@ -43,7 +43,7 @@ func (us *URLShortener) LoadURLsFromFile() error {
 	fmt.Printf("dir %s; fName %s; dir %s\n", dirName, fileName, trimDir)
 
 	// fullPath := dirName + "/" + fileName
-	file, err := os.Open(trimDir)
+	file, err := os.Open("/" + trimDir)
 	if err != nil {
 		// fmt.Printf("Error load file %s \n", err)
 		return err

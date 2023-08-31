@@ -25,12 +25,7 @@ func run() error {
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
 
-	err = shortener.LoadURLsFromFile()
-	if err != nil {
-		// log.Fatal(err)
-		logger.Log.Info("Error in LoadURLsFromFile", zap.Error(err))
-	}
-
+	fmt.Printf("cfg.FileStoragePath: %s\n", cfg.FileStoragePath)
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
 		// log.Fatal(err)
@@ -39,6 +34,12 @@ func run() error {
 	defer fileStorage.Close()
 
 	shortener := app.NewURLShortener(cfg, storage, fileStorage)
+
+	err = shortener.LoadURLsFromFile()
+	if err != nil {
+		// log.Fatal(err)
+		logger.Log.Info("Error in LoadURLsFromFile", zap.Error(err))
+	}
 
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
