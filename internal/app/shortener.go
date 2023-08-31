@@ -8,13 +8,14 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/Tokebay/yandex/config"
+	"github.com/Tokebay/yandex/internal/logger"
 	"github.com/Tokebay/yandex/internal/models"
+	"go.uber.org/zap"
 )
 
 const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -34,38 +35,31 @@ type URLData struct {
 	OriginalURL string `json:"original_url"`
 }
 
-func (us *URLShortener) LoadURLsFromFile() error {
-
-	dir, _ := filepath.Split(us.config.FileStoragePath)
-	dirName := filepath.Base(filepath.Clean(dir))
-	fileName := filepath.Base(filepath.Clean(us.config.FileStoragePath))
-	trimDir := strings.TrimLeft(us.config.FileStoragePath, "/")
-	fmt.Printf("dir %s; fName %s; dir %s\n", dirName, fileName, trimDir)
-
-	// fullPath := dirName + "/" + fileName
-	file, err := os.Open("/" + trimDir)
+func LoadURLsFromFile(filePath string, us *URLShortener) error {
+	filePath = strings.TrimLeft(filePath, "/")
+	fmt.Printf("filePath: %s", filePath)
+	file, err := os.Open(filePath)
 	if err != nil {
-		// fmt.Printf("Error load file %s \n", err)
+		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
 		return err
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
-	var urlDataSlice URLData
+	var urlDataSlice []URLData
 	err = decoder.Decode(&urlDataSlice)
 	if err != nil && !errors.Is(err, io.EOF) {
-		fmt.Printf("не смогли декодировать слайс %s\n", err)
+		logger.Log.Info("не смогли декодировать слайс", zap.Error(err))
 		return err
 	}
 
-	// for _, urlData := range urlDataSlice {
-	var urlData URLData
-	// восстанов. URL в хранилище storage
-	if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
-		fmt.Printf("не смогли восстановить данные из файла %s \n", err)
-		return err
+	for _, urlData := range urlDataSlice {
+		// Восстановление URL в хранилище storage
+		if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
+			logger.Log.Info("не смогли восстановить данные из файла", zap.Error(err))
+			return err
+		}
 	}
-	// }
 
 	return nil
 }

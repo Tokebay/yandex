@@ -35,7 +35,7 @@ func run() error {
 
 	shortener := app.NewURLShortener(cfg, storage, fileStorage)
 
-	err = shortener.LoadURLsFromFile()
+	err = app.LoadURLsFromFile(cfg.FileStoragePath, shortener)
 	if err != nil {
 		// log.Fatal(err)
 		logger.Log.Info("Error in LoadURLsFromFile", zap.Error(err))
