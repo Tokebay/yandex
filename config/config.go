@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -47,6 +48,7 @@ func (c *Config) parseEnv() {
 
 	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
 		fmt.Println("envFilePath ", envFilePath)
-		c.FileStoragePath = envFilePath
+		pEnvFilePath := strings.TrimLeft(envFilePath, "/")
+		c.FileStoragePath = pEnvFilePath
 	}
 }
