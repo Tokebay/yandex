@@ -47,8 +47,9 @@ func (c *Config) parseEnv() {
 	}
 
 	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
-		fmt.Println("envFilePath ", envFilePath)
+
 		pEnvFilePath := strings.TrimLeft(envFilePath, "/")
 		c.FileStoragePath = pEnvFilePath
+		fmt.Printf("envFilePath %s \n", c.FileStoragePath)
 	}
 }
