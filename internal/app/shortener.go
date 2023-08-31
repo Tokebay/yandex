@@ -2,7 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -36,8 +35,6 @@ type URLData struct {
 }
 
 func LoadURLsFromFile(filePath string, us *URLShortener) error {
-	filePath = strings.TrimLeft(filePath, "/")
-	fmt.Printf("filePath: %s", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
@@ -47,10 +44,14 @@ func LoadURLsFromFile(filePath string, us *URLShortener) error {
 
 	decoder := json.NewDecoder(file)
 	var urlDataSlice []URLData
-	err = decoder.Decode(&urlDataSlice)
-	if err != nil && !errors.Is(err, io.EOF) {
-		logger.Log.Info("не смогли декодировать слайс", zap.Error(err))
-		return err
+	for decoder.More() {
+		var urlData URLData
+		err := decoder.Decode(&urlData)
+		if err != nil {
+			logger.Log.Info("не смогли декодировать объект", zap.Error(err))
+			return err
+		}
+		urlDataSlice = append(urlDataSlice, urlData)
 	}
 
 	for _, urlData := range urlDataSlice {
