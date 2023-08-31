@@ -20,8 +20,9 @@ func NewProducer(filePath string) (*Producer, error) {
 	// fmt.Printf("dirPath %s \n", filePath)
 	// splitDir := strings.Split(filePath, "/")
 	// dirName := splitDir[0]
-	fmt.Printf("dirName %s\n", filepath.Base(filepath.Dir(filePath)))
+
 	dir := filepath.Base(filepath.Dir(filePath))
+	fmt.Printf("dirName %s\n", dir)
 	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err

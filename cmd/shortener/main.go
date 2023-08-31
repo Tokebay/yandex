@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/Tokebay/yandex/config"
@@ -26,18 +25,20 @@ func run() error {
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
 
+	err = shortener.LoadURLsFromFile()
+	if err != nil {
+		// log.Fatal(err)
+		logger.Log.Info("Error in LoadURLsFromFile", zap.Error(err))
+	}
+
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
+		logger.Log.Info("Error in NewProducer", zap.Error(err))
 	}
 	defer fileStorage.Close()
 
 	shortener := app.NewURLShortener(cfg, storage, fileStorage)
-
-	err = shortener.LoadURLsFromFile()
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
