@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -33,6 +34,7 @@ type URLData struct {
 }
 
 func (us *URLShortener) LoadURLsFromFile() error {
+
 	file, err := os.Open(us.config.FileStoragePath)
 	if err != nil {
 		return err
@@ -40,22 +42,31 @@ func (us *URLShortener) LoadURLsFromFile() error {
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
-	for {
-		var urlData URLData
-		if err := decoder.Decode(&urlData); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
+	var urlDataSlice []URLData
+	err = decoder.Decode(&urlDataSlice)
+	if err != nil && !errors.Is(err, io.EOF) {
+		fmt.Printf("не смогли декодировать слайс %s \n", err)
+		return err
+	}
 
+	for _, urlData := range urlDataSlice {
 		// восстанов. URL в хранилище storage
 		if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
+			fmt.Printf("не смогли восстановить данные из файла %s \n", err)
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (us *URLShortener) CloseFileStorage() error {
+	err := us.fileStorage.Flush() // Записываем данные из буфера в файл
+	if err != nil {
+		return err
+	}
+
+	return us.fileStorage.Close() // Закрываем файл
 }
 
 // Метод для установки функции генерации идентификатора
@@ -121,6 +132,11 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// if err := us.CloseFileStorage(); err != nil {
+	// 	http.Error(w, "error closing file storage", http.StatusInternalServerError)
+	// 	return
+	// }
+
 	resp := models.Response{
 		Result: shortenedURL,
 	}
@@ -168,6 +184,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		ShortURL:    shortenedURL,
 		OriginalURL: string(url),
 	}
+	// err = us.fileStorage.WriteEvent([]URLData{urlData})
 
 	if err := us.fileStorage.WriteEvent(urlData); err != nil {
 		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
@@ -213,6 +230,7 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
 	}
+
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)

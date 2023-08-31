@@ -2,20 +2,23 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
 
 type Producer struct {
-	file    *os.File
-	encoder *json.Encoder
+	file     *os.File
+	encoder  *json.Encoder
+	filePath string
+	buffer   []URLData
 }
 
 func NewProducer(filePath string) (*Producer, error) {
 
 	dir := filepath.Dir(filePath)
 	// fmt.Printf("dir: %s\n", dir)
-	err := os.MkdirAll(dir, 0755) //create the directory and give it required permissions
+	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -26,15 +29,42 @@ func NewProducer(filePath string) (*Producer, error) {
 	// fmt.Printf("filePath %s \n", filePath)
 
 	return &Producer{
-		file:    file,
-		encoder: json.NewEncoder(file),
+		file:     file,
+		encoder:  json.NewEncoder(file),
+		filePath: filePath,
+		buffer:   nil,
 	}, nil
 }
 
 func (p *Producer) WriteEvent(urlData *URLData) error {
-	return p.encoder.Encode(&urlData)
+	p.buffer = append(p.buffer, *urlData)
+	return p.Flush()
+}
+
+func (p *Producer) Flush() error {
+	// return p.encoder.Encode(&p.buffer)
+	file, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Encode and write the entire slice to the file
+	err = json.NewEncoder(file).Encode(p.buffer)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *Producer) Close() error {
-	return p.file.Close()
+	if err := p.Flush(); err != nil {
+		return fmt.Errorf("error flushing buffer: %w", err)
+	}
+	if err := p.file.Close(); err != nil {
+		return fmt.Errorf("error closing file: %w", err)
+	}
+	return nil
+
 }

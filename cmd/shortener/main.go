@@ -30,7 +30,7 @@ func run() error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer fileStorage.Close()
+	// defer fileStorage.Close()
 
 	shortener := app.NewURLShortener(cfg, storage, fileStorage)
 

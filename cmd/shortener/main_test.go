@@ -85,7 +85,7 @@ func TestApiShortenerURL(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := *app.NewURLShortener(cfg, &storage, fileStorage)
+	shortener := app.NewURLShortener(cfg, &storage, fileStorage)
 
 	shortener.SetGenerateIDFunc(func() string {
 		return "EwHXdJfB"
@@ -141,7 +141,6 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	shortener := app.NewURLShortener(
 		&config.Config{},
 		storage,
