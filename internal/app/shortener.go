@@ -26,6 +26,7 @@ type URLShortener struct {
 	fileStorage    *Producer
 	uuidCounter    int // счетчик UUID
 	uuidMu         sync.Mutex
+	URLDataSlice   []URLData
 }
 
 type URLData struct {
@@ -34,13 +35,13 @@ type URLData struct {
 	OriginalURL string `json:"original_url"`
 }
 
-func LoadURLsFromFile(filePath string) error {
+func LoadURLsFromFile(filePath string) ([]URLData, error) {
 
 	currentDir, err := os.Getwd()
 	fmt.Printf("currDir: %s\n", currentDir)
 	if err != nil {
 		logger.Log.Info("Error getting current working directory", zap.Error(err))
-		return err
+		return nil, err
 	}
 
 	// Сконструировать абсолютный путь к файлу
@@ -50,7 +51,7 @@ func LoadURLsFromFile(filePath string) error {
 	file, err := os.Open(absPath)
 	if err != nil {
 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
-		return err
+		return nil, err
 	}
 	defer file.Close()
 
@@ -61,12 +62,12 @@ func LoadURLsFromFile(filePath string) error {
 		err := decoder.Decode(&urlData)
 		if err != nil {
 			logger.Log.Info("не смогли декодировать объект", zap.Error(err))
-			return err
+			return nil, err
 		}
 		urlDataSlice = append(urlDataSlice, urlData)
 	}
 
-	return nil
+	return urlDataSlice, nil
 }
 
 func (us *URLShortener) CloseFileStorage() error {
@@ -127,19 +128,11 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "error saving URL", http.StatusInternalServerError)
 		return
 	}
-	if &cfg.FileStoragePath != nil {
-		uuid := us.GenerateUUID()
-		// Сохраняем данные в файловое хранилище
-		urlData := &URLData{
-			UUID:        uuid,
-			ShortURL:    shortenedURL,
-			OriginalURL: url,
-		}
 
-		if err := us.fileStorage.WriteEvent(urlData); err != nil {
-			http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
-			return
-		}
+	if err := us.SaveURLData(shortenedURL, []byte(url)); err != nil {
+		logger.Log.Error("Error saving URL in file", zap.Error(err))
+		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
+		return
 	}
 
 	resp := models.Response{
