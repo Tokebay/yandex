@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Tokebay/yandex/internal/logger"
+	"go.uber.org/zap"
 )
 
 type Producer struct {
@@ -17,9 +20,6 @@ type Producer struct {
 
 func NewProducer(filePath string) (*Producer, error) {
 
-	// fmt.Printf("dirPath %s \n", filePath)
-	// splitDir := strings.Split(filePath, "/")
-	// dirName := splitDir[0]
 	fmt.Printf("dirName %s\n", filepath.Base(filepath.Dir(filePath)))
 	dir := filepath.Base(filepath.Dir(filePath))
 	err := os.MkdirAll(dir, 0755)
@@ -29,40 +29,59 @@ func NewProducer(filePath string) (*Producer, error) {
 
 	// fileName := filepath.Base(filepath.Clean(filePath))
 	fileName := strings.TrimLeft(filePath, "/")
-	fmt.Println("fileName ", fileName)
-	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	fmt.Printf("fileName %s; filePath %s \n", fileName, filePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		fmt.Printf("err %s", err)
 		return nil, err
 	}
 
+	currentDir, err := os.Getwd()
+	fmt.Printf("currDir: %s\n", currentDir)
+	if err != nil {
+		logger.Log.Info("Error getting current working directory", zap.Error(err))
+	}
+
+	// абсолютный путь к файлу
+	absPath := filepath.Join(currentDir, filePath)
+	fmt.Printf("absPath: %s\n", absPath)
+
 	return &Producer{
 		file:     file,
 		encoder:  json.NewEncoder(file),
-		filePath: filePath,
+		filePath: absPath,
 		buffer:   nil,
 	}, nil
 }
 
 func (p *Producer) WriteEvent(urlData *URLData) error {
 	p.buffer = append(p.buffer, *urlData)
-	return p.Flush()
+	if err := p.Flush(); err != nil {
+		logger.Log.Error("Error saving URL in file", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func (p *Producer) Flush() error {
-	filePath := strings.TrimLeft(p.filePath, "/")
-	fmt.Printf("p.Name %s\n", filePath)
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	fmt.Printf("p.filePath %s\n", p.filePath)
+	file, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
+		logger.Log.Error("Error opening file", zap.Error(err))
 		return err
 	}
-	defer file.Close()
 
-	// Encode and append the buffer contents to the file
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			fmt.Printf("Error closing file: %v\n", closeErr)
+		}
+	}()
+
 	encoder := json.NewEncoder(file)
 	for _, urlData := range p.buffer {
 		if err := encoder.Encode(urlData); err != nil {
-			return err
+			logger.Log.Error("Error encoding data", zap.Error(err))
+			return err // Вернуть ошибку, если произошла ошибка при записи
 		}
 	}
 

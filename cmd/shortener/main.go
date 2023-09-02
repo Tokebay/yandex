@@ -24,22 +24,26 @@ func run() error {
 
 	cfg := config.NewConfig()
 	storage := app.NewMapStorage()
+	var fileStorage *app.Producer
+	var err error
 
-	fmt.Printf("cfg.FileStoragePath: %s\n", cfg.FileStoragePath)
-	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
-	if err != nil {
-		// log.Fatal(err)
-		logger.Log.Info("Error in NewProducer", zap.Error(err))
+	fmt.Printf("FileStoragePath: %s\n", cfg.FileStoragePath)
+	if cfg.FileStoragePath != "" {
+		fileStorage, err = app.NewProducer(cfg.FileStoragePath)
+		if err != nil {
+			logger.Log.Error("Error in NewProducer", zap.Error(err))
+			return err
+		}
+		defer fileStorage.Close()
+
+		err = app.LoadURLsFromFile(cfg.FileStoragePath)
+		if err != nil {
+			logger.Log.Error("Error in LoadURLsFromFile", zap.Error(err))
+			return err
+		}
 	}
-	defer fileStorage.Close()
 
 	shortener := app.NewURLShortener(cfg, storage, fileStorage)
-
-	err = app.LoadURLsFromFile(cfg.FileStoragePath, shortener)
-	if err != nil {
-		// log.Fatal(err)
-		logger.Log.Info("Error in LoadURLsFromFile", zap.Error(err))
-	}
 
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
@@ -60,7 +64,8 @@ func run() error {
 	err = http.ListenAndServe(addr, r)
 	if err != nil {
 		logger.Log.Fatal("Failed to start server", zap.Error(err))
+		return err
 	}
 
-	return err
+	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -35,9 +34,20 @@ type URLData struct {
 	OriginalURL string `json:"original_url"`
 }
 
-func LoadURLsFromFile(filePath string, us *URLShortener) error {
-	fileName := filepath.Base(filepath.Clean(filePath))
-	file, err := os.Open(fileName)
+func LoadURLsFromFile(filePath string) error {
+
+	currentDir, err := os.Getwd()
+	fmt.Printf("currDir: %s\n", currentDir)
+	if err != nil {
+		logger.Log.Info("Error getting current working directory", zap.Error(err))
+		return err
+	}
+
+	// Сконструировать абсолютный путь к файлу
+	absPath := filepath.Join(currentDir, filePath)
+	fmt.Printf("absPath: %s\n", absPath)
+
+	file, err := os.Open(absPath)
 	if err != nil {
 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
 		return err
@@ -54,14 +64,6 @@ func LoadURLsFromFile(filePath string, us *URLShortener) error {
 			return err
 		}
 		urlDataSlice = append(urlDataSlice, urlData)
-	}
-
-	for _, urlData := range urlDataSlice {
-		// Восстановление URL в хранилище storage
-		if err := us.storage.SaveURL(strconv.Itoa(urlData.UUID), urlData.OriginalURL); err != nil {
-			logger.Log.Info("не смогли восстановить данные из файла", zap.Error(err))
-			return err
-		}
 	}
 
 	return nil
@@ -125,24 +127,20 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "error saving URL", http.StatusInternalServerError)
 		return
 	}
+	if &cfg.FileStoragePath != nil {
+		uuid := us.GenerateUUID()
+		// Сохраняем данные в файловое хранилище
+		urlData := &URLData{
+			UUID:        uuid,
+			ShortURL:    shortenedURL,
+			OriginalURL: url,
+		}
 
-	uuid := us.GenerateUUID()
-	// Сохраняем данные в файловое хранилище
-	urlData := &URLData{
-		UUID:        uuid,
-		ShortURL:    shortenedURL,
-		OriginalURL: url,
+		if err := us.fileStorage.WriteEvent(urlData); err != nil {
+			http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
+			return
+		}
 	}
-
-	if err := us.fileStorage.WriteEvent(urlData); err != nil {
-		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
-		return
-	}
-
-	// if err := us.CloseFileStorage(); err != nil {
-	// 	http.Error(w, "error closing file storage", http.StatusInternalServerError)
-	// 	return
-	// }
 
 	resp := models.Response{
 		Result: shortenedURL,
@@ -179,21 +177,17 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
+	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	// сохранение в мапу
 	err = us.storage.SaveURL(id, string(url))
 	if err != nil {
+		logger.Log.Error("Error saving URL", zap.Error(err))
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
-	uuid := us.GenerateUUID()
-	// Сохраняем данные в файловое хранилище
-	urlData := &URLData{
-		UUID:        uuid,
-		ShortURL:    shortenedURL,
-		OriginalURL: string(url),
-	}
-	// err = us.fileStorage.WriteEvent([]URLData{urlData})
 
-	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+	if err := us.SaveURLData(shortenedURL, url); err != nil {
+		logger.Log.Error("Error saving URL in file", zap.Error(err))
 		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
 	}
@@ -211,6 +205,23 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
+func (us *URLShortener) SaveURLData(shortenedURL string, url []byte) error {
+	uuid := us.GenerateUUID()
+
+	urlData := &URLData{
+		UUID:        uuid,
+		ShortURL:    shortenedURL,
+		OriginalURL: string(url),
+	}
+
+	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+		logger.Log.Error("error saving URL data in file", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
 func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -225,15 +236,8 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Сохраняем информацию о перенаправлении в файловое хранилище
-	uuid := us.GenerateUUID()
-	urlData := &URLData{
-		UUID:        uuid,
-		ShortURL:    r.URL.Path,
-		OriginalURL: originalURL,
-	}
-
-	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+	if err := us.SaveURLData(id, []byte(originalURL)); err != nil {
+		logger.Log.Error("Error saving URL in file", zap.Error(err))
 		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
 	}
