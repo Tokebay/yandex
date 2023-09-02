@@ -42,11 +42,11 @@ func run() error {
 			logger.Log.Error("Error in LoadURLsFromFile", zap.Error(err))
 			return err
 		}
+		shortener = app.NewURLShortener(cfg, storage, fileStorage)
 		shortener.URLDataSlice = urlDataSlice
+	} else {
+		shortener = app.NewURLShortener(cfg, storage, fileStorage)
 	}
-
-	shortener = app.NewURLShortener(cfg, storage, fileStorage)
-
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
 	// промежуточное ПО (middleware) для логирования. перед каждым запросом будет выполнена функция logger.LoggerMiddleware
