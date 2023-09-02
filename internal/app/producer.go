@@ -47,9 +47,10 @@ func NewProducer(filePath string) (*Producer, error) {
 	fmt.Printf("absPath: %s\n", absPath)
 
 	return &Producer{
-		file:     file,
-		encoder:  json.NewEncoder(file),
-		filePath: absPath,
+		file:    file,
+		encoder: json.NewEncoder(file),
+		//filePath: absPath,
+		filePath: filePath,
 		buffer:   nil,
 	}, nil
 }

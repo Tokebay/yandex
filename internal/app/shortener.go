@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -22,7 +21,7 @@ const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123
 type URLShortener struct {
 	generateIDFunc func() string
 	config         *config.Config
-	storage        URLStorage
+	Storage        URLStorage
 	fileStorage    *Producer
 	uuidCounter    int // счетчик UUID
 	uuidMu         sync.Mutex
@@ -37,18 +36,18 @@ type URLData struct {
 
 func LoadURLsFromFile(filePath string) ([]URLData, error) {
 
-	currentDir, err := os.Getwd()
-	fmt.Printf("currDir: %s\n", currentDir)
-	if err != nil {
-		logger.Log.Info("Error getting current working directory", zap.Error(err))
-		return nil, err
-	}
+	//currentDir, err := os.Getwd()
+	//fmt.Printf("currDir: %s\n", currentDir)
+	//if err != nil {
+	//	logger.Log.Info("Error getting current working directory", zap.Error(err))
+	//	return nil, err
+	//}
+	//
+	//// Сконструировать абсолютный путь к файлу
+	//absPath := filepath.Join(currentDir, filePath)
+	//fmt.Printf("absPath: %s\n", absPath)
 
-	// Сконструировать абсолютный путь к файлу
-	absPath := filepath.Join(currentDir, filePath)
-	fmt.Printf("absPath: %s\n", absPath)
-
-	file, err := os.Open(absPath)
+	file, err := os.Open(filePath)
 	if err != nil {
 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
 		return nil, err
@@ -66,6 +65,8 @@ func LoadURLsFromFile(filePath string) ([]URLData, error) {
 		}
 		urlDataSlice = append(urlDataSlice, urlData)
 	}
+
+	fmt.Printf("1111111111111111 %+v \n", urlDataSlice)
 
 	return urlDataSlice, nil
 }
@@ -95,7 +96,7 @@ func (us *URLShortener) GenerateUUID() int {
 func NewURLShortener(cfg *config.Config, storage URLStorage, fileStorage *Producer) *URLShortener {
 	us := &URLShortener{
 		config:      cfg,
-		storage:     storage,
+		Storage:     storage,
 		fileStorage: fileStorage,
 		uuidCounter: 0,
 	}
@@ -123,7 +124,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	cfg := us.config
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	err := us.storage.SaveURL(id, url)
+	err := us.Storage.SaveURL(id, url)
 	if err != nil {
 		http.Error(w, "error saving URL", http.StatusInternalServerError)
 		return
@@ -172,7 +173,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	// сохранение в мапу
-	err = us.storage.SaveURL(id, string(url))
+	err = us.Storage.SaveURL(shortenedURL, string(url))
 	if err != nil {
 		logger.Log.Error("Error saving URL", zap.Error(err))
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
@@ -221,24 +222,15 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	id := strings.TrimPrefix(r.URL.Path, "/")
-
-	originalURL, err := us.storage.GetURL(id)
+	originalURL, err := us.Storage.GetURL(r.URL.Path)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
-		return
-	}
-
-	if err := us.SaveURLData(id, []byte(originalURL)); err != nil {
-		logger.Log.Error("Error saving URL in file", zap.Error(err))
-		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
 	}
 
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-
 }
 
 func (us *URLShortener) GenerateID() string {

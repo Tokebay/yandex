@@ -44,6 +44,15 @@ func run() error {
 		}
 		shortener = app.NewURLShortener(cfg, storage, fileStorage)
 		shortener.URLDataSlice = urlDataSlice
+		for _, u := range urlDataSlice {
+			err = shortener.Storage.SaveURL(u.ShortURL, u.OriginalURL)
+			if err != nil {
+				logger.Log.Error("Error: " + err.Error())
+			}
+		}
+
+		shortener.Storage.ShowMapping() //todo: remove
+
 	} else {
 		shortener = app.NewURLShortener(cfg, storage, fileStorage)
 	}
