@@ -2,15 +2,13 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"os"
-	"strconv"
 )
 
 type Config struct {
 	ServerAddress   string
 	BaseURL         string
-	ServerPort      int
+	ServerPort      string
 	FileStoragePath string
 }
 
@@ -20,7 +18,7 @@ func NewConfig() *Config {
 
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "HTTP server address")
 	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
-	flag.IntVar(&config.ServerPort, "p", 8080, "HTTP server port")
+	flag.StringVar(&config.ServerPort, "p", "8080", "HTTP server port")
 	flag.StringVar(&config.FileStoragePath, "f", "/tmp/short-url-db.json", "Path to FILE_STORAGE_PATH")
 
 	flag.Parse()
@@ -38,11 +36,8 @@ func (c *Config) parseEnv() {
 	}
 
 	if serverPort := os.Getenv("SERVER_PORT"); serverPort != "" {
-		port, err := strconv.Atoi(serverPort)
-		fmt.Println("port ", port, serverPort)
-		if err == nil {
-			c.ServerPort = port
-		}
+		c.ServerPort = serverPort
+
 	}
 
 	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
