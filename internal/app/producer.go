@@ -20,8 +20,9 @@ type Producer struct {
 
 func NewProducer(filePath string) (*Producer, error) {
 
-	fmt.Printf("dirName %s\n", filepath.Base(filepath.Dir(filePath)))
 	dir := filepath.Base(filepath.Dir(filePath))
+	fmt.Printf("dirName %s\n", dir)
+
 	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return nil, err
@@ -41,10 +42,6 @@ func NewProducer(filePath string) (*Producer, error) {
 	if err != nil {
 		logger.Log.Info("Error getting current working directory", zap.Error(err))
 	}
-
-	// абсолютный путь к файлу
-	absPath := filepath.Join(currentDir, filePath)
-	fmt.Printf("absPath: %s\n", absPath)
 
 	return &Producer{
 		file:    file,

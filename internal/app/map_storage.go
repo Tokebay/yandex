@@ -23,21 +23,22 @@ func NewMapStorage() *MapStorage {
 	}
 }
 
-func (ms *MapStorage) SaveURL(id, url string) error {
+func (ms *MapStorage) SaveURL(shortenURL, originalURL string) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
-	ms.mapping[id] = url
+	//fmt.Printf("save id %s; url %s \n", id, url)
+	ms.mapping[shortenURL] = originalURL
 	// fmt.Printf("Saved URL: id=%s, url=%s\n", id, url)
 	return nil
 }
 
-func (ms *MapStorage) GetURL(id string) (string, error) {
+func (ms *MapStorage) GetURL(shortenURL string) (string, error) {
 	ms.mu.RLock()
 	defer ms.mu.RUnlock()
 
-	url, ok := ms.mapping[id]
-
+	url, ok := ms.mapping[shortenURL]
+	fmt.Printf("getURL %s; url %s \n", shortenURL, url)
 	if !ok {
 		return "", errors.New("url not found")
 	}

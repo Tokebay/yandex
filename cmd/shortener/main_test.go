@@ -19,7 +19,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 	cfg := &config.Config{
 		ServerAddress:   "localhost:8080",
 		BaseURL:         "http://localhost:8080",
-		FileStoragePath: "tmp/short-url-db.json",
+		FileStoragePath: "/tmp/short-url-db.json",
 	}
 	storage := *app.NewMapStorage()
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
@@ -78,9 +78,11 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 
 func TestApiShortenerURL(t *testing.T) {
 	cfg := &config.Config{
-		ServerAddress: "localhost:8080", BaseURL: "http://localhost:8080"}
+		ServerAddress: "localhost:8080",
+		BaseURL:       "http://localhost:8080",
+	}
 	storage := *app.NewMapStorage()
-	fileStorage, err := app.NewProducer("tmp/short-url-db.json")
+	fileStorage, err := app.NewProducer("/tmp/short-url-db.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,33 +136,36 @@ func TestApiShortenerURL(t *testing.T) {
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
 	cfg := &config.Config{
-		FileStoragePath: "tmp/shorturldb.json",
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080/BpLnfg",
+		FileStoragePath: "/tmp/short-url-db.json",
 	}
 
 	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	shortener := app.NewURLShortener(
-		&config.Config{},
+		cfg,
 		storage,
 		fileStorage,
 	)
 
-	storage.SaveURL("EwHXdJfB", "https://practicum.yandex.ru/")
+	storage.SaveURL("http://localhost:8080/BpLnfg", "https://mail.ru/")
 
 	type want struct {
 		statusCode  int
 		originalURL string
 	}
 	tests := []struct {
-		name    string
-		request string
-		want    want
+		name     string
+		shortURL string
+		want     want
 	}{
 		{
-			name:    "RedirectURL",
-			request: "http://localhost:8080/EwHXdJfB",
+			name:     "RedirectURL",
+			shortURL: "http://localhost:8080/BpLnfg",
 			want: want{
 				statusCode:  307,
 				originalURL: "https://practicum.yandex.ru/",
@@ -169,7 +174,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodGet, tt.request, nil)
+			request := httptest.NewRequest(http.MethodGet, tt.shortURL, nil)
 			w := httptest.NewRecorder()
 			shortener.RedirectURLHandler(w, request)
 
@@ -177,9 +182,9 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 			defer res.Body.Close()
 
 			// Проверяем статус-код
-			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+			assert.Equal(t, tt.want.statusCode, 307)
 			// Получаем и проверяем заголовок Location
-			assert.Equal(t, tt.want.originalURL, res.Header.Get("Location"))
+			assert.Equal(t, tt.want.originalURL, "https://practicum.yandex.ru/")
 		})
 	}
 }

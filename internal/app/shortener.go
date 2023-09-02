@@ -66,7 +66,7 @@ func LoadURLsFromFile(filePath string) ([]URLData, error) {
 		urlDataSlice = append(urlDataSlice, urlData)
 	}
 
-	fmt.Printf("1111111111111111 %+v \n", urlDataSlice)
+	// fmt.Printf("urlDataSlice %+v \n", urlDataSlice)
 
 	return urlDataSlice, nil
 }
@@ -221,8 +221,9 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	originalURL, err := us.Storage.GetURL(r.URL.Path)
+	cfg := us.config
+	fmt.Printf("r.URL.Path %s; shortURL %s \n", r.URL.Path, cfg.BaseURL+r.URL.Path)
+	originalURL, err := us.Storage.GetURL(cfg.BaseURL + r.URL.Path)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
