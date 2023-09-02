@@ -18,9 +18,9 @@ func NewConfig() *Config {
 	config := &Config{}
 	config.parseEnv()
 
-	flag.StringVar(&config.ServerAddress, "a", "localhost:8888", "HTTP server address")
-	flag.StringVar(&config.BaseURL, "b", "http://localhost:8888", "Base URL for shortened URLs")
-	flag.IntVar(&config.ServerPort, "p", 8888, "HTTP server port")
+	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "HTTP server address")
+	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
+	flag.IntVar(&config.ServerPort, "p", 8080, "HTTP server port")
 	flag.StringVar(&config.FileStoragePath, "f", "/tmp/short-url-db.json", "Path to FILE_STORAGE_PATH")
 
 	flag.Parse()
@@ -46,10 +46,6 @@ func (c *Config) parseEnv() {
 	}
 
 	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
-
 		c.FileStoragePath = envFilePath
-		fmt.Printf("envFilePath %s \n", c.FileStoragePath)
-	} else {
-		c.FileStoragePath = ""
 	}
 }
