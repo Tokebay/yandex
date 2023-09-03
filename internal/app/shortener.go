@@ -36,16 +36,7 @@ type URLData struct {
 
 func LoadURLsFromFile(filePath string) ([]URLData, error) {
 
-	//currentDir, err := os.Getwd()
-	//fmt.Printf("currDir: %s\n", currentDir)
-	//if err != nil {
-	//	logger.Log.Info("Error getting current working directory", zap.Error(err))
-	//	return nil, err
-	//}
-	//
-	//// Сконструировать абсолютный путь к файлу
-	//absPath := filepath.Join(currentDir, filePath)
-	//fmt.Printf("absPath: %s\n", absPath)
+	fmt.Printf("absPath: %s\n", filePath)
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -171,8 +162,8 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
-	// сохранение в мапу
+	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	// сохранение URL в мапу
 	err = us.Storage.SaveURL(id, string(url))
 	if err != nil {
 		logger.Log.Error("Error saving URL", zap.Error(err))
@@ -208,7 +199,7 @@ func (us *URLShortener) SaveToFileURL(shortenedURL string, url []byte) error {
 		OriginalURL: string(url),
 	}
 
-	if err := us.fileStorage.WriteEvent(urlData); err != nil {
+	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
 		logger.Log.Error("error saving URL data in file", zap.Error(err))
 		return err
 	}
@@ -241,7 +232,7 @@ func (us *URLShortener) GenerateID() string {
 	base := len(base62Alphabet)
 	var idBuilder strings.Builder
 	// Генерируем случайный идентификатор из 6 символов
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 10; i++ {
 		index := rand.Intn(base)
 		idBuilder.WriteByte(base62Alphabet[index])
 	}

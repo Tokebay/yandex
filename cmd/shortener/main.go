@@ -38,6 +38,7 @@ func run() error {
 		}
 		defer fileStorage.Close()
 
+		// получение всех URL из файла
 		urlDataSlice, err := app.LoadURLsFromFile(cfg.FileStoragePath)
 		if err != nil {
 			logger.Log.Error("Error in LoadURLsFromFile", zap.Error(err))
