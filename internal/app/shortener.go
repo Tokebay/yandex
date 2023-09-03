@@ -164,7 +164,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	// сохранение URL в мапу
-	err = us.Storage.SaveURL(shortenedURL, string(url))
+	err = us.Storage.SaveURL(id, string(url))
 	if err != nil {
 		logger.Log.Error("Error saving URL", zap.Error(err))
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
