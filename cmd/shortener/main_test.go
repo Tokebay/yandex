@@ -184,7 +184,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 			// Проверяем статус-код
 			assert.Equal(t, tt.want.statusCode, 307)
 			// Получаем и проверяем заголовок Location
-			assert.Equal(t, tt.want.originalURL, "https://practicum.yandex.ru/")
+			assert.Equal(t, tt.want.originalURL, res.Header.Get("Location"))
 		})
 	}
 }

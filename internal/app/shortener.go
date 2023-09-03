@@ -130,7 +130,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := us.SaveURLData(shortenedURL, []byte(url)); err != nil {
+	if err := us.SaveToFileURL(shortenedURL, []byte(url)); err != nil {
 		logger.Log.Error("Error saving URL in file", zap.Error(err))
 		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
@@ -171,16 +171,16 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	// сохранение в мапу
-	err = us.Storage.SaveURL(shortenedURL, string(url))
+	err = us.Storage.SaveURL(id, string(url))
 	if err != nil {
 		logger.Log.Error("Error saving URL", zap.Error(err))
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
 		return
 	}
 
-	if err := us.SaveURLData(shortenedURL, url); err != nil {
+	if err := us.SaveToFileURL(shortenedURL, url); err != nil {
 		logger.Log.Error("Error saving URL in file", zap.Error(err))
 		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
 		return
@@ -199,7 +199,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (us *URLShortener) SaveURLData(shortenedURL string, url []byte) error {
+func (us *URLShortener) SaveToFileURL(shortenedURL string, url []byte) error {
 	uuid := us.GenerateUUID()
 
 	urlData := &URLData{
@@ -221,9 +221,8 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	cfg := us.config
-	fmt.Printf("r.URL.Path %s; shortURL %s \n", r.URL.Path, cfg.BaseURL+r.URL.Path)
-	originalURL, err := us.Storage.GetURL(cfg.BaseURL + r.URL.Path)
+	URLId := strings.TrimPrefix(r.URL.Path, "/")
+	originalURL, err := us.Storage.GetURL(URLId)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
@@ -242,7 +241,7 @@ func (us *URLShortener) GenerateID() string {
 	base := len(base62Alphabet)
 	var idBuilder strings.Builder
 	// Генерируем случайный идентификатор из 6 символов
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 8; i++ {
 		index := rand.Intn(base)
 		idBuilder.WriteByte(base62Alphabet[index])
 	}
