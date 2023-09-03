@@ -152,7 +152,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 		fileStorage,
 	)
 
-	storage.SaveURL("http://localhost:8080/BpLnfg", "https://mail.ru/")
+	storage.SaveURL("BpLnfgSfEr", "https://mail.ru/")
 
 	type want struct {
 		statusCode  int
@@ -165,10 +165,10 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	}{
 		{
 			name:     "RedirectURL",
-			shortURL: "http://localhost:8080/BpLnfg",
+			shortURL: "http://localhost:8080/BpLnfgSfEr",
 			want: want{
 				statusCode:  307,
-				originalURL: "https://practicum.yandex.ru/",
+				originalURL: "https://mail.ru/",
 			},
 		},
 	}
