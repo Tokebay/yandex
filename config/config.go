@@ -14,7 +14,6 @@ type Config struct {
 
 func NewConfig() *Config {
 	config := &Config{}
-	config.parseEnv()
 
 	flag.StringVar(&config.ServerAddress, "a", "localhost:8080", "HTTP server address")
 	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
@@ -22,6 +21,8 @@ func NewConfig() *Config {
 	flag.StringVar(&config.FileStoragePath, "f", "/tmp/short-url-db.json", "Path to FILE_STORAGE_PATH")
 
 	flag.Parse()
+
+	config.parseEnv()
 
 	return config
 }

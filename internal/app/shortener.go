@@ -164,7 +164,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	// сохранение URL в мапу
-	err = us.Storage.SaveURL(id, string(url))
+	err = us.Storage.SaveURL(shortenedURL, string(url))
 	if err != nil {
 		logger.Log.Error("Error saving URL", zap.Error(err))
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
@@ -212,8 +212,10 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	URLId := strings.TrimPrefix(r.URL.Path, "/")
-	originalURL, err := us.Storage.GetURL(URLId)
+	// URLId := strings.TrimPrefix(r.URL.Path, "/")
+
+	fmt.Printf("111111111 %s \n", us.config.BaseURL+r.URL.String())
+	originalURL, err := us.Storage.GetURL(us.config.BaseURL + r.URL.String())
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return

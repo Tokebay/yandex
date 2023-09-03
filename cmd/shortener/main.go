@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/Tokebay/yandex/config"
 
@@ -48,16 +47,17 @@ func run() error {
 		shortener.URLDataSlice = urlDataSlice
 		for _, u := range urlDataSlice {
 
-			parts := strings.Split(u.ShortURL, "/")
-			URLId := parts[len(parts)-1]
-			fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
-			err = shortener.Storage.SaveURL(URLId, u.OriginalURL)
+			// parts := strings.Split(u.ShortURL, "/")
+			// URLId := parts[len(parts)-1]
+			// fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
+			fmt.Printf("222222222  shortURL %s; \n", u.ShortURL)
+			err = shortener.Storage.SaveURL(u.ShortURL, u.OriginalURL)
 			if err != nil {
 				logger.Log.Error("Error: " + err.Error())
 			}
 		}
 
-		// shortener.Storage.ShowMapping() //todo: remove
+		shortener.Storage.ShowMapping() //todo: remove
 
 	} else {
 		shortener = app.NewURLShortener(cfg, storage, fileStorage)
