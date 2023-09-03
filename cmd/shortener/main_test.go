@@ -137,7 +137,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 	storage := app.NewMapStorage()
 	cfg := &config.Config{
 		ServerAddress:   "localhost:8080",
-		BaseURL:         "http://localhost:8080/BpLnfg",
+		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "/tmp/short-url-db.json",
 	}
 

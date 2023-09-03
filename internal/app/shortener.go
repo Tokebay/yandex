@@ -212,10 +212,10 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// URLId := strings.TrimPrefix(r.URL.Path, "/")
+	URLId := strings.TrimPrefix(r.URL.Path, "/")
 
-	fmt.Printf("111111111 %s \n", us.config.BaseURL+r.URL.String())
-	originalURL, err := us.Storage.GetURL(us.config.BaseURL + r.URL.String())
+	// fmt.Printf("111111111 %s \n", r.Host+r.URL.String())
+	originalURL, err := us.Storage.GetURL(URLId)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
