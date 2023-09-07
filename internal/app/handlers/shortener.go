@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/Tokebay/yandex/config"
+	"github.com/google/uuid"
 
 	"github.com/Tokebay/yandex/internal/app/storage"
 	"github.com/Tokebay/yandex/internal/logger"
@@ -35,32 +35,6 @@ type URLData struct {
 	OriginalURL string `json:"original_url"`
 }
 
-// func LoadURLsFromFile(filePath string) ([]URLData, error) {
-
-// 	fmt.Printf("filePath: %s\n", filePath)
-
-// 	file, err := os.Open(filePath)
-// 	if err != nil {
-// 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-
-// 	decoder := json.NewDecoder(file)
-// 	var urlDataSlice []URLData
-// 	for decoder.More() {
-// 		var urlData URLData
-// 		err := decoder.Decode(&urlData)
-// 		if err != nil {
-// 			logger.Log.Info("не смогли декодировать объект", zap.Error(err))
-// 			return nil, err
-// 		}
-// 		urlDataSlice = append(urlDataSlice, urlData)
-// 	}
-
-// 	return urlDataSlice, nil
-// }
-
 func (us *URLShortener) CloseFileStorage() error {
 	return us.fileStorage.Close() // Закрываем файл
 }
@@ -85,7 +59,6 @@ func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage
 		fileStorage: fileStorage,
 		uuidCounter: 0,
 	}
-
 	return us
 }
 
@@ -162,7 +135,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	// fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	// сохранение URL в мапу
 	err = us.Storage.SaveURL(id, string(url))
 	if err != nil {
@@ -171,15 +144,20 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	urlData := &URLData{
-		UUID:        us.GenerateUUID(),
-		ShortURL:    shortenedURL,
-		OriginalURL: string(url),
-	}
+	// если флаг пустой то не записываем данные в файл
+	fmt.Printf("FileStoragePath: %s \n", cfg.FileStoragePath)
 
-	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-		logger.Log.Error("Error saving URL data in file", zap.Error(err))
-		return
+	if cfg.FileStoragePath != "" {
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+
+		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
+		}
 	}
 
 	fmt.Printf("Original URL: %s\n", url)
@@ -215,17 +193,22 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (us *URLShortener) GenerateID() string {
+	// для тестов
 	if us.generateIDFunc != nil {
 		return us.generateIDFunc()
 	}
-
-	base := len(base62Alphabet)
-	var idBuilder strings.Builder
-	// Генерируем случайный идентификатор из 6 символов
-	for i := 0; i < 10; i++ {
-		index := rand.Intn(base)
-		idBuilder.WriteByte(base62Alphabet[index])
+	// Генерируем UUID
+	u, err := uuid.NewRandom()
+	if err != nil {
+		// Обработка ошибки генерации UUID
+		return ""
+	}
+	// Преобразуем UUID в строку, убираем дефисы и берем первые 10 символов
+	id := strings.Replace(u.String(), "-", "", -1)
+	if len(id) > 10 {
+		id = id[:10]
 	}
 
-	return idBuilder.String()
+	return id
+
 }

@@ -38,15 +38,6 @@ func GzipMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// type gzipResponseWriter struct {
-// 	io.Writer
-// 	http.ResponseWriter
-// }
-
-// func (w gzipResponseWriter) Write(b []byte) (int, error) {
-// 	return w.Writer.Write(b)
-// }
-
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера
 // сжимать передаваемые данные и выставлять правильные HTTP-заголовки
 type compressWriter struct {
@@ -54,10 +45,10 @@ type compressWriter struct {
 	zw *gzip.Writer
 }
 
-func newCompressWriter(w http.ResponseWriter) *compressWriter {
+func newCompressWriter(rw http.ResponseWriter) *compressWriter {
 	return &compressWriter{
-		w:  w,
-		zw: gzip.NewWriter(w),
+		w:  rw,
+		zw: gzip.NewWriter(rw),
 	}
 }
 

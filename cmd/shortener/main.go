@@ -38,7 +38,7 @@ func run() error {
 		}
 		defer fileStorage.Close()
 
-		urlDataSlice, err := fileStorage.LoadFromFile()
+		urlDataSlice, err := fileStorage.LoadInitialData()
 		if err != nil {
 			logger.Log.Error("Error loading data from file", zap.Error(err))
 			return err
@@ -52,16 +52,7 @@ func run() error {
 				return err
 			}
 		}
-
-		// получение всех URL из файла
-		// urlDataSlice, err := handlers.LoadURLsFromFile(cfg.FileStoragePath)
-		// if err != nil {
-		// 	logger.Log.Error("Error in LoadURLsFromFile", zap.Error(err))
-		// 	return err
-		// }
 		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
-		// shortener.URLDataSlice = urlDataSlice
-
 	} else {
 		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
 	}

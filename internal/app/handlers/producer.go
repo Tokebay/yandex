@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/Tokebay/yandex/internal/logger"
 	"go.uber.org/zap"
@@ -47,8 +46,8 @@ func NewProducer(filePath string) (*Producer, error) {
 }
 
 func (p *Producer) SaveToFileURL(urlData *URLData) error {
-	// Load existing data from the file
-	existingData, err := p.LoadFromFile()
+	// Загрузка существующих данных
+	existingData, err := p.LoadInitialData()
 	if err != nil {
 		return err
 	}
@@ -56,11 +55,11 @@ func (p *Producer) SaveToFileURL(urlData *URLData) error {
 	// Append the new URLData to the existing data
 	existingData = append(existingData, *urlData)
 
-	for _, u := range existingData {
-		parts := strings.Split(u.ShortURL, "/")
-		URLId := parts[len(parts)-1]
-		fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
-	}
+	// for _, u := range existingData {
+	// 	parts := strings.Split(u.ShortURL, "/")
+	// 	URLId := parts[len(parts)-1]
+	// 	fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
+	// }
 
 	// Write the updated data back to the file
 	if err := p.WriteToFile(existingData); err != nil {
@@ -71,7 +70,7 @@ func (p *Producer) SaveToFileURL(urlData *URLData) error {
 	return nil
 }
 
-func (p *Producer) LoadFromFile() ([]URLData, error) {
+func (p *Producer) LoadInitialData() ([]URLData, error) {
 	fmt.Printf("p.filePath loadFromFile %s: \n", p.filePath)
 	file, err := os.OpenFile(p.filePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -115,9 +114,6 @@ func (p *Producer) WriteToFile(urlData []URLData) error {
 }
 
 func (p *Producer) Close() error {
-	// if err := p.Flush(); err != nil {
-	// 	return fmt.Errorf("error flushing buffer: %w", err)
-	// }
 	if err := p.file.Close(); err != nil {
 		return fmt.Errorf("error closing file: %w", err)
 	}

@@ -9,7 +9,6 @@ import (
 type URLStorage interface {
 	SaveURL(id, url string) error
 	GetURL(id string) (string, error)
-	ShowMapping() //todo: remove
 }
 
 type MapStorage struct {
@@ -43,12 +42,4 @@ func (ms *MapStorage) GetURL(shortenURL string) (string, error) {
 		return "", errors.New("url not found")
 	}
 	return url, nil
-}
-
-func (ms *MapStorage) ShowMapping() {
-	fmt.Println("+++++++++++++++++++++++++++ ShowMapping +++++++++++++++++++++++++++++++++++++")
-	for key, val := range ms.mapping {
-		fmt.Printf("%v -> %v\n", key, val)
-	}
-	fmt.Println("+++++++++++++++++++++++++++++ ShowMapping +++++++++++++++++++++++++++++++++++")
 }
