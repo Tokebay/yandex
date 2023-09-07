@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/Tokebay/yandex/config"
-	"github.com/Tokebay/yandex/internal/app"
+
+	"github.com/Tokebay/yandex/internal/app/handlers"
+	"github.com/Tokebay/yandex/internal/app/storage"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,13 +23,13 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "/tmp/short-url-db.json",
 	}
-	storage := *app.NewMapStorage()
-	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
+	storage := *storage.NewMapStorage()
+	fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := app.NewURLShortener(cfg, &storage, fileStorage)
+	shortener := handlers.NewURLShortener(cfg, &storage, fileStorage)
 
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
@@ -81,13 +83,13 @@ func TestApiShortenerURL(t *testing.T) {
 		ServerAddress: "localhost:8080",
 		BaseURL:       "http://localhost:8080",
 	}
-	storage := *app.NewMapStorage()
-	fileStorage, err := app.NewProducer("/tmp/short-url-db.json")
+	storage := *storage.NewMapStorage()
+	fileStorage, err := handlers.NewProducer("/tmp/short-url-db.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := app.NewURLShortener(cfg, &storage, fileStorage)
+	shortener := handlers.NewURLShortener(cfg, &storage, fileStorage)
 
 	shortener.SetGenerateIDFunc(func() string {
 		return "EwHXdJfB"
@@ -134,19 +136,19 @@ func TestApiShortenerURL(t *testing.T) {
 }
 
 func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
-	storage := app.NewMapStorage()
+	storage := storage.NewMapStorage()
 	cfg := &config.Config{
 		ServerAddress:   "localhost:8080",
 		BaseURL:         "http://localhost:8080",
 		FileStoragePath: "/tmp/short-url-db.json",
 	}
 
-	fileStorage, err := app.NewProducer(cfg.FileStoragePath)
+	fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	shortener := app.NewURLShortener(
+	shortener := handlers.NewURLShortener(
 		cfg,
 		storage,
 		fileStorage,

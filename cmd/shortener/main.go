@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/Tokebay/yandex/config"
 
-	"github.com/Tokebay/yandex/internal/app"
+	"github.com/Tokebay/yandex/internal/app/handlers"
+	"github.com/Tokebay/yandex/internal/app/storage"
 	logger "github.com/Tokebay/yandex/internal/logger"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -24,44 +24,46 @@ func run() error {
 	logger.Initialize("info")
 
 	cfg := config.NewConfig()
-	storage := app.NewMapStorage()
-	var fileStorage *app.Producer
-	var shortener *app.URLShortener
+	storage := storage.NewMapStorage()
+	var fileStorage *handlers.Producer
+	var shortener *handlers.URLShortener
 	var err error
 
 	fmt.Printf("FileStoragePath: %s\n", cfg.FileStoragePath)
 	if cfg.FileStoragePath != "" {
-		fileStorage, err = app.NewProducer(cfg.FileStoragePath)
+		fileStorage, err = handlers.NewProducer(cfg.FileStoragePath)
 		if err != nil {
 			logger.Log.Error("Error in NewProducer", zap.Error(err))
 			return err
 		}
 		defer fileStorage.Close()
 
-		// получение всех URL из файла
-		urlDataSlice, err := app.LoadURLsFromFile(cfg.FileStoragePath)
+		urlDataSlice, err := fileStorage.LoadFromFile()
 		if err != nil {
-			logger.Log.Error("Error in LoadURLsFromFile", zap.Error(err))
+			logger.Log.Error("Error loading data from file", zap.Error(err))
 			return err
 		}
-		shortener = app.NewURLShortener(cfg, storage, fileStorage)
-		shortener.URLDataSlice = urlDataSlice
-		for _, u := range urlDataSlice {
 
-			parts := strings.Split(u.ShortURL, "/")
-			URLId := parts[len(parts)-1]
-			fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
-			// fmt.Printf("222222222  shortURL %s; \n", u.ShortURL)
-			err = shortener.Storage.SaveURL(URLId, u.OriginalURL)
+		for _, urlData := range urlDataSlice {
+			// fmt.Printf("urlData.ShortURL %s;  urlData.OriginalUR %s \n", urlData.ShortURL, urlData.OriginalURL)
+			err := storage.SaveURL(urlData.ShortURL, urlData.OriginalURL)
 			if err != nil {
-				logger.Log.Error("Error: " + err.Error())
+				logger.Log.Error("Error saving URL to storage", zap.Error(err))
+				return err
 			}
 		}
 
-		shortener.Storage.ShowMapping() //todo: remove
+		// получение всех URL из файла
+		// urlDataSlice, err := handlers.LoadURLsFromFile(cfg.FileStoragePath)
+		// if err != nil {
+		// 	logger.Log.Error("Error in LoadURLsFromFile", zap.Error(err))
+		// 	return err
+		// }
+		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
+		// shortener.URLDataSlice = urlDataSlice
 
 	} else {
-		shortener = app.NewURLShortener(cfg, storage, fileStorage)
+		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
 	}
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
 	r := chi.NewRouter()
@@ -69,7 +71,7 @@ func run() error {
 	r.Use(logger.LoggerMiddleware)
 	r.Use(logger.RecoveryMiddleware)
 	// middleware проверяет поддержку сжатия gzip
-	r.Use(app.GzipMiddleware)
+	r.Use(handlers.GzipMiddleware)
 
 	r.Post("/", shortener.ShortenURLHandler)
 	r.Get("/{id}", shortener.RedirectURLHandler)

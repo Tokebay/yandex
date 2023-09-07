@@ -1,4 +1,4 @@
-package app
+package handlers
 
 import (
 	"encoding/json"
@@ -6,11 +6,12 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 
 	"github.com/Tokebay/yandex/config"
+
+	"github.com/Tokebay/yandex/internal/app/storage"
 	"github.com/Tokebay/yandex/internal/logger"
 	"github.com/Tokebay/yandex/internal/models"
 	"go.uber.org/zap"
@@ -21,7 +22,7 @@ const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123
 type URLShortener struct {
 	generateIDFunc func() string
 	config         *config.Config
-	Storage        URLStorage
+	Storage        storage.URLStorage
 	fileStorage    *Producer
 	uuidCounter    int // счетчик UUID
 	uuidMu         sync.Mutex
@@ -34,40 +35,33 @@ type URLData struct {
 	OriginalURL string `json:"original_url"`
 }
 
-func LoadURLsFromFile(filePath string) ([]URLData, error) {
+// func LoadURLsFromFile(filePath string) ([]URLData, error) {
 
-	fmt.Printf("absPath: %s\n", filePath)
+// 	fmt.Printf("filePath: %s\n", filePath)
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
-		return nil, err
-	}
-	defer file.Close()
+// 	file, err := os.Open(filePath)
+// 	if err != nil {
+// 		logger.Log.Info("Error os.Open in LoadURLsFromFile", zap.Error(err))
+// 		return nil, err
+// 	}
+// 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
-	var urlDataSlice []URLData
-	for decoder.More() {
-		var urlData URLData
-		err := decoder.Decode(&urlData)
-		if err != nil {
-			logger.Log.Info("не смогли декодировать объект", zap.Error(err))
-			return nil, err
-		}
-		urlDataSlice = append(urlDataSlice, urlData)
-	}
+// 	decoder := json.NewDecoder(file)
+// 	var urlDataSlice []URLData
+// 	for decoder.More() {
+// 		var urlData URLData
+// 		err := decoder.Decode(&urlData)
+// 		if err != nil {
+// 			logger.Log.Info("не смогли декодировать объект", zap.Error(err))
+// 			return nil, err
+// 		}
+// 		urlDataSlice = append(urlDataSlice, urlData)
+// 	}
 
-	// fmt.Printf("urlDataSlice %+v \n", urlDataSlice)
-
-	return urlDataSlice, nil
-}
+// 	return urlDataSlice, nil
+// }
 
 func (us *URLShortener) CloseFileStorage() error {
-	err := us.fileStorage.Flush() // Записываем данные из буфера в файл
-	if err != nil {
-		return err
-	}
-
 	return us.fileStorage.Close() // Закрываем файл
 }
 
@@ -84,7 +78,7 @@ func (us *URLShortener) GenerateUUID() int {
 	return us.uuidCounter
 }
 
-func NewURLShortener(cfg *config.Config, storage URLStorage, fileStorage *Producer) *URLShortener {
+func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage *Producer) *URLShortener {
 	us := &URLShortener{
 		config:      cfg,
 		Storage:     storage,
@@ -121,9 +115,14 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := us.SaveToFileURL(shortenedURL, []byte(url)); err != nil {
-		logger.Log.Error("Error saving URL in file", zap.Error(err))
-		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
+	urlData := &URLData{
+		UUID:        us.GenerateUUID(),
+		ShortURL:    shortenedURL,
+		OriginalURL: string(url),
+	}
+
+	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+		logger.Log.Error("Error saving URL data in file", zap.Error(err))
 		return
 	}
 
@@ -133,6 +132,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	jsonData, err := json.Marshal(&resp)
 	if err != nil {
 		http.Error(w, "error creating JSON response", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -171,9 +171,14 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := us.SaveToFileURL(shortenedURL, url); err != nil {
-		logger.Log.Error("Error saving URL in file", zap.Error(err))
-		http.Error(w, "error saving URL data in file", http.StatusInternalServerError)
+	urlData := &URLData{
+		UUID:        us.GenerateUUID(),
+		ShortURL:    shortenedURL,
+		OriginalURL: string(url),
+	}
+
+	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+		logger.Log.Error("Error saving URL data in file", zap.Error(err))
 		return
 	}
 
@@ -190,23 +195,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (us *URLShortener) SaveToFileURL(shortenedURL string, url []byte) error {
-	uuid := us.GenerateUUID()
-
-	urlData := &URLData{
-		UUID:        uuid,
-		ShortURL:    shortenedURL,
-		OriginalURL: string(url),
-	}
-
-	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-		logger.Log.Error("error saving URL data in file", zap.Error(err))
-		return err
-	}
-
-	return nil
-}
-
 func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -214,7 +202,7 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	}
 	URLId := strings.TrimPrefix(r.URL.Path, "/")
 
-	// fmt.Printf("111111111 %s \n", r.Host+r.URL.String())
+	// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
 	originalURL, err := us.Storage.GetURL(URLId)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
