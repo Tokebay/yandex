@@ -69,6 +69,13 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Проверяем Content-Type
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		http.Error(w, "unsupported content type", http.StatusUnsupportedMediaType)
+		return
+	}
+
 	var req models.Request
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
@@ -162,8 +169,11 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	fmt.Printf("Original URL: %s\n", url)
 	fmt.Printf("Shortened URL: %s\n", shortenedURL)
+
+	// w.Header().Set("text/html", "Accept-Encoding")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
+
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(shortenedURL))
 

@@ -23,15 +23,16 @@ func run() error {
 	//Инициализируется логгер
 	logger.Initialize("info")
 
+	// конфиг для запуска
 	cfg := config.NewConfig()
+
 	storage := storage.NewMapStorage()
 	var fileStorage *handlers.Producer
 	var shortener *handlers.URLShortener
-	var err error
 
 	fmt.Printf("FileStoragePath: %s\n", cfg.FileStoragePath)
 	if cfg.FileStoragePath != "" {
-		fileStorage, err = handlers.NewProducer(cfg.FileStoragePath)
+		fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
 		if err != nil {
 			logger.Log.Error("Error in NewProducer", zap.Error(err))
 			return err
@@ -67,12 +68,13 @@ func run() error {
 	r.Post("/", shortener.ShortenURLHandler)
 	r.Get("/{id}", shortener.RedirectURLHandler)
 	r.Post("/api/shorten", shortener.APIShortenerURL)
+	r.Get("/ping", shortener.CheckDBConnect)
 
 	addr := cfg.ServerAddress
 	logger.Log.Info("Server is starting", zap.String("address", addr))
 
 	// Запускается HTTP-сервер, который начинает прослушивание указанного адреса addr и использует маршрутизатор r для обработки запросов.
-	err = http.ListenAndServe(addr, r)
+	err := http.ListenAndServe(addr, r)
 	if err != nil {
 		logger.Log.Fatal("Failed to start server", zap.Error(err))
 		return err
