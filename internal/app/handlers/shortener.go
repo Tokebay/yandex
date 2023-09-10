@@ -190,13 +190,13 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	}
 	URLId := strings.TrimPrefix(r.URL.Path, "/")
 
-	// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
+	fmt.Printf("redirect url %s \n", URLId)
 	originalURL, err := us.Storage.GetURL(URLId)
 	if err != nil {
 		http.Error(w, "URL not found", http.StatusBadRequest)
 		return
 	}
-
+	fmt.Printf("original url %s \n", originalURL)
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
