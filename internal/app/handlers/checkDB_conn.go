@@ -18,7 +18,7 @@ func (us *URLShortener) CheckDBConnect(w http.ResponseWriter, r *http.Request) {
 
 	_, err := us.GetDB()
 	if err != nil {
-		logger.Log.Error("Error getDB", zap.Error(err))
+		logger.Log.Error("Error connect to DB", zap.Error(err))
 	}
 	w.WriteHeader(http.StatusOK)
 	// _, err = w.Write([]byte("success"))
