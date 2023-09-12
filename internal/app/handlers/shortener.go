@@ -147,7 +147,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 
 	// если флаг пустой то не записываем данные в файл
-	fmt.Printf("FileStoragePath: %s, DB_DSN %s \n", cfg.FileStoragePath, cfg.DataBaseConnString)
+	// fmt.Printf("FileStoragePath: %s, DB_DSN %s \n", cfg.FileStoragePath, cfg.DataBaseConnString)
 
 	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
 		// сохранение URL в мапу
@@ -231,12 +231,14 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		originalURL, err = us.GetOriginDBURL(cfg.BaseURL + r.URL.Path)
 		// fmt.Printf("original url 1 %s \n", originalURL)
 		if err != nil {
-			logger.Log.Error("Error occured while get URL from DB", zap.Error(err))
+			logger.Log.Error("Error URL not found in DB", zap.Error(err))
+			http.Error(w, "URL not found", http.StatusBadRequest)
 			return
 		}
 	} else {
 		originalURL, err = us.Storage.GetURL(URLId)
 		if err != nil {
+			logger.Log.Error("URL not found", zap.Error(err))
 			http.Error(w, "URL not found", http.StatusBadRequest)
 			return
 		}
