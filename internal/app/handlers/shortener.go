@@ -82,21 +82,30 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	cfg := us.config
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	err := us.Storage.SaveMapURL(id, url)
-	if err != nil {
-		http.Error(w, "error saving URL", http.StatusInternalServerError)
-		return
+	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
+		err := us.Storage.SaveMapURL(id, url)
+		if err != nil {
+			http.Error(w, "error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+
+		us.SaveToFile(urlData)
 	}
 
-	urlData := &URLData{
-		UUID:        us.GenerateUUID(),
-		ShortURL:    shortenedURL,
-		OriginalURL: string(url),
-	}
-
-	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-		logger.Log.Error("Error saving URL data in file", zap.Error(err))
-		return
+	if cfg.DataBaseConnString != "" {
+		// заполняем структуру ShortenURL для записи в таблицу
+		shortenURL := &models.ShortenURL{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		us.SaveToDB(shortenURL)
 	}
 
 	resp := models.Response{
@@ -137,18 +146,17 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 
-	// сохранение URL в мапу
-	err = us.Storage.SaveMapURL(id, string(url))
-	if err != nil {
-		logger.Log.Error("Error saving URL", zap.Error(err))
-		http.Error(w, "Error saving URL", http.StatusInternalServerError)
-		return
-	}
-
 	// если флаг пустой то не записываем данные в файл
 	fmt.Printf("FileStoragePath: %s, DB_DSN %s \n", cfg.FileStoragePath, cfg.DataBaseConnString)
 
 	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
+		// сохранение URL в мапу
+		err = us.Storage.SaveMapURL(id, string(url))
+		if err != nil {
+			logger.Log.Error("Error saving URL", zap.Error(err))
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
 
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),
