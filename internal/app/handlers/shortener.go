@@ -145,45 +145,35 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, shortenedURL)
+	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	// сохранение URL в мапу
+	err = us.Storage.SaveMapURL(id, string(url))
+	if err != nil {
+		logger.Log.Error("Error saving URL", zap.Error(err))
+		http.Error(w, "Error saving URL", http.StatusInternalServerError)
+		return
+	}
 
 	// если флаг пустой то не записываем данные в файл
 	fmt.Printf("FileStoragePath: %s \n", cfg.FileStoragePath)
 
-	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
-		// сохранение URL в мапу
-		err = us.Storage.SaveMapURL(id, string(url))
-		if err != nil {
-			logger.Log.Error("Error saving URL", zap.Error(err))
-			http.Error(w, "Error saving URL", http.StatusInternalServerError)
-			return
-		}
-
+	if cfg.FileStoragePath != "" {
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),
 			ShortURL:    shortenedURL,
 			OriginalURL: string(url),
 		}
 
-		us.SaveToFile(urlData)
-	}
-
-	if cfg.DataBaseConnString != "" {
-		// заполняем структуру ShortenURL для записи в таблицу
-		shortenURL := &models.ShortenURL{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
+		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
 		}
-		us.SaveToDB(shortenURL)
 	}
 
 	fmt.Printf("Original URL: %s\n", url)
 	fmt.Printf("Shortened URL: %s\n", shortenedURL)
-
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
-
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(shortenedURL))
 
@@ -242,29 +232,14 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	URLId := strings.TrimPrefix(r.URL.Path, "/")
-	cfg := us.config
-	fmt.Printf("redirect url %s \n", cfg.BaseURL+r.URL.Path)
-	var originalURL string
-	var err error
 
-	// если флаг -d не пустой берем данные из базы
-	if cfg.DataBaseConnString != "" {
-		originalURL, err = us.GetOriginDBURL(cfg.BaseURL + r.URL.Path)
-		fmt.Printf("original url %s \n", originalURL)
-		if err != nil {
-			logger.Log.Info("Error URL not found in DB", zap.Error(err))
-			http.Error(w, "URL not found", http.StatusBadRequest)
-			return
-		}
-	} else {
-		originalURL, err = us.Storage.GetURL(URLId)
-		if err != nil {
-			logger.Log.Info("URL not found", zap.Error(err))
-			http.Error(w, "URL not found", http.StatusBadRequest)
-			return
-		}
-
+	// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
+	originalURL, err := us.Storage.GetURL(URLId)
+	if err != nil {
+		http.Error(w, "URL not found", http.StatusBadRequest)
+		return
 	}
+
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
