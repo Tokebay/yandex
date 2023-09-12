@@ -145,10 +145,10 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, shortenedURL)
 
 	// если флаг пустой то не записываем данные в файл
-	// fmt.Printf("FileStoragePath: %s, DB_DSN %s \n", cfg.FileStoragePath, cfg.DataBaseConnString)
+	fmt.Printf("FileStoragePath: %s \n", cfg.FileStoragePath)
 
 	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
 		// сохранение URL в мапу
