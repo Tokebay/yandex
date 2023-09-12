@@ -30,31 +30,37 @@ func run() error {
 	var fileStorage *handlers.Producer
 	var shortener *handlers.URLShortener
 
-	fmt.Printf("FileStoragePath: %s\n", cfg.FileStoragePath)
-	if cfg.FileStoragePath != "" {
-		fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
-		if err != nil {
-			logger.Log.Error("Error in NewProducer", zap.Error(err))
-			return err
-		}
-		defer fileStorage.Close()
+	fmt.Printf("FileStoragePath: %s; DSN: %s\n", cfg.FileStoragePath, cfg.DataBaseConnString)
 
-		urlDataSlice, err := fileStorage.LoadInitialData()
-		if err != nil {
-			logger.Log.Error("Error loading data from file", zap.Error(err))
-			return err
-		}
+	// если флаг -d пустой пропускаем и сохраняем все в map и файл
+	if cfg.DataBaseConnString == "" {
 
-		for _, urlData := range urlDataSlice {
-			// fmt.Printf("urlData.ShortURL %s;  urlData.OriginalUR %s \n", urlData.ShortURL, urlData.OriginalURL)
-			err := storage.SaveURL(urlData.ShortURL, urlData.OriginalURL)
+		if cfg.FileStoragePath != "" {
+			fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
 			if err != nil {
-				logger.Log.Error("Error saving URL to storage", zap.Error(err))
+				logger.Log.Error("Error in NewProducer", zap.Error(err))
 				return err
 			}
+			defer fileStorage.Close()
+
+			urlDataSlice, err := fileStorage.LoadInitialData()
+			if err != nil {
+				logger.Log.Error("Error loading data from file", zap.Error(err))
+				return err
+			}
+
+			for _, urlData := range urlDataSlice {
+				// fmt.Printf("urlData.ShortURL %s;  urlData.OriginalUR %s \n", urlData.ShortURL, urlData.OriginalURL)
+				err := storage.SaveMapURL(urlData.ShortURL, urlData.OriginalURL)
+				if err != nil {
+					logger.Log.Error("Error saving URL to storage", zap.Error(err))
+					return err
+				}
+			}
+			shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
 		}
-		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
 	} else {
+		// если флаг -f пустой
 		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
 	}
 	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.

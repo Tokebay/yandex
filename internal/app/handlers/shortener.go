@@ -82,7 +82,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	cfg := us.config
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	err := us.Storage.SaveURL(id, url)
+	err := us.Storage.SaveMapURL(id, url)
 	if err != nil {
 		http.Error(w, "error saving URL", http.StatusInternalServerError)
 		return
@@ -136,8 +136,9 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	shortenedURL := cfg.BaseURL + "/" + id
 
 	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+
 	// сохранение URL в мапу
-	err = us.Storage.SaveURL(id, string(url))
+	err = us.Storage.SaveMapURL(id, string(url))
 	if err != nil {
 		logger.Log.Error("Error saving URL", zap.Error(err))
 		http.Error(w, "Error saving URL", http.StatusInternalServerError)
@@ -145,25 +146,32 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// если флаг пустой то не записываем данные в файл
-	fmt.Printf("FileStoragePath: %s \n", cfg.FileStoragePath)
+	fmt.Printf("FileStoragePath: %s, DB_DSN %s \n", cfg.FileStoragePath, cfg.DataBaseConnString)
 
-	if cfg.FileStoragePath != "" {
+	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
+
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),
 			ShortURL:    shortenedURL,
 			OriginalURL: string(url),
 		}
 
-		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-			logger.Log.Error("Error saving URL data in file", zap.Error(err))
-			return
+		us.SaveToFile(urlData)
+	}
+
+	if cfg.DataBaseConnString != "" {
+		// заполняем структуру ShortenURL для записи в таблицу
+		shortenURL := &models.ShortenURL{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
 		}
+		us.SaveToDB(shortenURL)
 	}
 
 	fmt.Printf("Original URL: %s\n", url)
 	fmt.Printf("Shortened URL: %s\n", shortenedURL)
 
-	// w.Header().Set("text/html", "Accept-Encoding")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
 
@@ -174,6 +182,29 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (us *URLShortener) SaveToFile(urlData *URLData) error {
+
+	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+		logger.Log.Error("Error saving URL data in file", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (us *URLShortener) SaveToDB(shortenURL *models.ShortenURL) error {
+	//create table
+	db, err := us.CreateTable()
+	if err != nil {
+		logger.Log.Error("Error occured while creating DB", zap.Error(err))
+		return err
+	}
+	// insert data
+	db.Create(&shortenURL)
+
+	return nil
 }
 
 func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {

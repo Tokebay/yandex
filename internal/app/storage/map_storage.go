@@ -7,7 +7,7 @@ import (
 )
 
 type URLStorage interface {
-	SaveURL(id, url string) error
+	SaveMapURL(id, url string) error
 	GetURL(id string) (string, error)
 }
 
@@ -22,7 +22,7 @@ func NewMapStorage() *MapStorage {
 	}
 }
 
-func (ms *MapStorage) SaveURL(shortenURL, originalURL string) error {
+func (ms *MapStorage) SaveMapURL(shortenURL, originalURL string) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 

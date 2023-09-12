@@ -159,7 +159,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 		fileStorage,
 	)
 
-	storage.SaveURL("BpLnfgSfEr", "https://mail.ru/")
+	storage.SaveMapURL("BpLnfgSfEr", "https://mail.ru/")
 
 	type want struct {
 		statusCode  int
