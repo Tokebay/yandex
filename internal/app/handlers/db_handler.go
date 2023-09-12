@@ -24,6 +24,21 @@ func (us *URLShortener) CreateTable() (*gorm.DB, error) {
 	return db, nil
 }
 
+func (us *URLShortener) GetOriginDbURL(shortenURL string) (string, error) {
+	db, err := us.PostgresInit()
+	if err != nil {
+		logger.Log.Error("Error connect to DB", zap.Error(err))
+		return "", err
+	}
+	// Get  matched record
+	var url models.ShortenURL
+	if err := db.Select("original_url").Where("short_url = ?", &shortenURL).First(&url).Error; err != nil {
+		return "", err
+	}
+
+	return url.OriginalURL, nil
+}
+
 // проверяем соединение с БД
 func (us *URLShortener) CheckDBConnect(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -63,7 +78,7 @@ func (us *URLShortener) GetDB() (*sql.DB, error) {
 func (us *URLShortener) PostgresInit() (*gorm.DB, error) {
 	dsn := us.config.DataBaseConnString
 
-	fmt.Printf("dsn %s \n", dsn)
+	// fmt.Printf("dsn %s \n", dsn)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		logger.Log.Error("Error establishing connection with DB", zap.Error(err))

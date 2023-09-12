@@ -221,14 +221,27 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	URLId := strings.TrimPrefix(r.URL.Path, "/")
+	cfg := us.config
+	fmt.Printf("redirect url %s \n", cfg.BaseURL+r.URL.Path)
+	var originalURL string
+	var err error
 
-	fmt.Printf("redirect url %s \n", URLId)
-	originalURL, err := us.Storage.GetURL(URLId)
-	if err != nil {
-		http.Error(w, "URL not found", http.StatusBadRequest)
-		return
+	// если флаг -d не пустой берем данные из базы
+	if cfg.DataBaseConnString != "" {
+		originalURL, err = us.GetOriginDbURL(cfg.BaseURL + r.URL.Path)
+		// fmt.Printf("original url 1 %s \n", originalURL)
+		if err != nil {
+			logger.Log.Error("Error occured while get URL from DB", zap.Error(err))
+			return
+		}
+	} else {
+		originalURL, err = us.Storage.GetURL(URLId)
+		if err != nil {
+			http.Error(w, "URL not found", http.StatusBadRequest)
+			return
+		}
+
 	}
-	fmt.Printf("original url %s \n", originalURL)
 	// Выполняем перенаправление на оригинальный URL
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
