@@ -34,7 +34,7 @@ func NewConfig() *Config {
 	db := &DataBase{
 		DBName:   "postgres",
 		Host:     "localhost",
-		Port:     5433,
+		Port:     5432,
 		User:     "postgres",
 		Password: "postgres",
 	}
