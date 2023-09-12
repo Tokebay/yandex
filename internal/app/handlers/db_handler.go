@@ -46,13 +46,22 @@ func (us *URLShortener) CheckDBConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := us.GetDB()
+	db, err := us.GetDB()
 	if err != nil {
 		logger.Log.Error("Error connect to DB", zap.Error(err))
+		http.Error(w, "Error connect to DB", http.StatusInternalServerError)
+		return
 	}
+	defer db.Close()
 
+	err = CreateShortenedURLTable(db)
+	if err != nil {
+		logger.Log.Error("Error create table", zap.Error(err))
+		http.Error(w, "Error create table", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
-	// _, err = w.Write([]byte("success"))
+
 }
 
 func (us *URLShortener) GetDB() (*sql.DB, error) {
@@ -64,7 +73,6 @@ func (us *URLShortener) GetDB() (*sql.DB, error) {
 		logger.Log.Error("Error open connection with DB", zap.Error(err))
 
 	}
-	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
@@ -74,10 +82,25 @@ func (us *URLShortener) GetDB() (*sql.DB, error) {
 
 	return db, nil
 }
+func CreateShortenedURLTable(db *sql.DB) error {
+	// Создаем таблицу shortened_urls, если она еще не существует
+	_, err := db.Exec(`
+	CREATE TABLE IF NOT EXISTS public.shorten_urls
+	(
+		id SERIAL PRIMARY KEY,
+		uuid text,
+		short_url text COLLATE pg_catalog."default",
+		original_url text COLLATE pg_catalog."default"
+	)`)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func (us *URLShortener) PostgresInit() (*gorm.DB, error) {
-	dsn := us.config.DataBaseConnString
 
+	dsn := us.config.DataBaseConnString
 	// fmt.Printf("dsn %s \n", dsn)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {

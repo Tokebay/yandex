@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -203,16 +204,36 @@ func (us *URLShortener) SaveToFile(urlData *URLData) error {
 }
 
 func (us *URLShortener) SaveToDB(shortenURL *models.ShortenURL) error {
-	//create table
-	db, err := us.CreateTable()
+	//ping DB
+	db, err := us.GetDB()
 	if err != nil {
-		logger.Log.Error("Error occured while creating DB", zap.Error(err))
+		logger.Log.Error("Error connect to DB", zap.Error(err))
+	}
+	err = us.InsertData(db, shortenURL)
+	if err != nil {
+		logger.Log.Info("Error insert data to table", zap.Error(err))
 		return err
 	}
+	//create table
+	// db, err := us.PostgresInit()
+	// if err != nil {
+	// 	logger.Log.Info("Error init DB connection", zap.Error(err))
+	// 	return err
+	// }
 	// insert data
-	db.Create(&shortenURL)
+	// db.Create(&shortenURL)
 
 	return nil
+}
+
+func (us *URLShortener) InsertData(db *sql.DB, url *models.ShortenURL) error {
+
+	_, err := db.Exec(`
+        INSERT INTO shorten_urls (uuid, short_url, original_url)
+        VALUES ($1, $2, $3)`,
+		url.UUID, url.ShortURL, url.OriginalURL)
+
+	return err
 }
 
 func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
@@ -231,14 +252,14 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		originalURL, err = us.GetOriginDBURL(cfg.BaseURL + r.URL.Path)
 		fmt.Printf("original url %s \n", originalURL)
 		if err != nil {
-			logger.Log.Error("Error URL not found in DB", zap.Error(err))
+			logger.Log.Info("Error URL not found in DB", zap.Error(err))
 			http.Error(w, "URL not found", http.StatusBadRequest)
 			return
 		}
 	} else {
 		originalURL, err = us.Storage.GetURL(URLId)
 		if err != nil {
-			logger.Log.Error("URL not found", zap.Error(err))
+			logger.Log.Info("URL not found", zap.Error(err))
 			http.Error(w, "URL not found", http.StatusBadRequest)
 			return
 		}
