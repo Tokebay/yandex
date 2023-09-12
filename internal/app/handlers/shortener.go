@@ -228,7 +228,7 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 
 	// если флаг -d не пустой берем данные из базы
 	if cfg.DataBaseConnString != "" {
-		originalURL, err = us.GetOriginDbURL(cfg.BaseURL + r.URL.Path)
+		originalURL, err = us.GetOriginDBURL(cfg.BaseURL + r.URL.Path)
 		// fmt.Printf("original url 1 %s \n", originalURL)
 		if err != nil {
 			logger.Log.Error("Error occured while get URL from DB", zap.Error(err))

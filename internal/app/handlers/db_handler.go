@@ -24,7 +24,7 @@ func (us *URLShortener) CreateTable() (*gorm.DB, error) {
 	return db, nil
 }
 
-func (us *URLShortener) GetOriginDbURL(shortenURL string) (string, error) {
+func (us *URLShortener) GetOriginDBURL(shortenURL string) (string, error) {
 	db, err := us.PostgresInit()
 	if err != nil {
 		logger.Log.Error("Error connect to DB", zap.Error(err))
