@@ -66,7 +66,7 @@ func run() error {
 	r := chi.NewRouter()
 	// промежуточное ПО (middleware) для логирования. перед каждым запросом будет выполнена функция logger.LoggerMiddleware
 	r.Use(logger.LoggerMiddleware)
-	r.Use(logger.RecoveryMiddleware)
+	// r.Use(logger.RecoveryMiddleware)
 	// middleware проверяет поддержку сжатия gzip
 	r.Use(handlers.GzipMiddleware)
 
