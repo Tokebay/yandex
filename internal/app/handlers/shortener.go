@@ -160,6 +160,9 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		}
 		shortURL := cfg.BaseURL + r.URL.Path
 		originalURL, err = us.SelectURLData(db, shortURL)
+		if err != nil {
+			logger.Log.Error("Error get row from DB", zap.Error(err))
+		}
 	}
 	// Выполняем перенаправление на оригинальный URL
 	fmt.Printf("select originalURL %s", originalURL)
