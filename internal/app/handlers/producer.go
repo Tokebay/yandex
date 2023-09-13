@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/Tokebay/yandex/internal/logger"
 	"go.uber.org/zap"
@@ -56,11 +55,11 @@ func (p *Producer) SaveToFileURL(urlData *URLData) error {
 	// Append the new URLData to the existing data
 	existingData = append(existingData, *urlData)
 
-	for _, u := range existingData {
-		parts := strings.Split(u.ShortURL, "/")
-		URLId := parts[len(parts)-1]
-		fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
-	}
+	// for _, u := range existingData {
+	// 	parts := strings.Split(u.ShortURL, "/")
+	// 	URLId := parts[len(parts)-1]
+	// 	fmt.Printf("shortURL %s; partID %s; origURL %s \n", u.ShortURL, URLId, u.OriginalURL)
+	// }
 
 	// Write the updated data back to the file
 	if err := p.WriteToFile(existingData); err != nil {

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -63,70 +62,6 @@ func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage
 	return us
 }
 
-func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req models.Request
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&req); err != nil {
-		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-	url := req.URL
-
-	id := us.GenerateID()
-	cfg := us.config
-	shortenedURL := cfg.BaseURL + "/" + id
-
-	if cfg.FileStoragePath != "" && cfg.DataBaseConnString == "" {
-		err := us.Storage.SaveMapURL(id, url)
-		if err != nil {
-			http.Error(w, "error saving URL", http.StatusInternalServerError)
-			return
-		}
-
-		urlData := &URLData{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
-		}
-
-		us.SaveToFile(urlData)
-	}
-
-	if cfg.DataBaseConnString != "" {
-		// заполняем структуру ShortenURL для записи в таблицу
-		shortenURL := &models.ShortenURL{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
-		}
-		us.SaveToDB(shortenURL)
-	}
-
-	resp := models.Response{
-		Result: shortenedURL,
-	}
-	jsonData, err := json.Marshal(&resp)
-	if err != nil {
-		http.Error(w, "error creating JSON response", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	_, err = w.Write(jsonData)
-	if err != nil {
-		http.Error(w, "error writing response", http.StatusInternalServerError)
-	}
-}
-
 func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -145,27 +80,35 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
-	// сохранение URL в мапу
-	err = us.Storage.SaveMapURL(id, string(url))
-	if err != nil {
-		logger.Log.Error("Error saving URL", zap.Error(err))
-		http.Error(w, "Error saving URL", http.StatusInternalServerError)
-		return
+	urlData := &URLData{
+		UUID:        us.GenerateUUID(),
+		ShortURL:    shortenedURL,
+		OriginalURL: string(url),
 	}
 
-	// если флаг пустой то не записываем данные в файл
-	fmt.Printf("FileStoragePath: %s \n", cfg.FileStoragePath)
-
-	if cfg.FileStoragePath != "" {
-		urlData := &URLData{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
+	if cfg.DataBaseConnString == "" {
+		// сохранение URL в мапу
+		fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+		err = us.Storage.SaveMapURL(id, string(url))
+		if err != nil {
+			logger.Log.Error("Error saving URL", zap.Error(err))
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
 		}
 
 		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
 			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
+		}
+	} else {
+		shortenURL := &models.ShortenURL{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		_, err := us.SaveToDB(shortenURL)
+		if err != nil {
+			http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -193,56 +136,103 @@ func (us *URLShortener) SaveToFile(urlData *URLData) error {
 	return nil
 }
 
-func (us *URLShortener) SaveToDB(shortenURL *models.ShortenURL) error {
-	//ping DB
-	db, err := us.GetDB()
-	if err != nil {
-		logger.Log.Error("Error connect to DB", zap.Error(err))
-	}
-	err = us.InsertData(db, shortenURL)
-	if err != nil {
-		logger.Log.Info("Error insert data to table", zap.Error(err))
-		return err
-	}
-	//create table
-	// db, err := us.PostgresInit()
-	// if err != nil {
-	// 	logger.Log.Info("Error init DB connection", zap.Error(err))
-	// 	return err
-	// }
-	// insert data
-	// db.Create(&shortenURL)
-
-	return nil
-}
-
-func (us *URLShortener) InsertData(db *sql.DB, url *models.ShortenURL) error {
-
-	_, err := db.Exec(`
-        INSERT INTO shorten_urls (uuid, short_url, original_url)
-        VALUES ($1, $2, $3)`,
-		url.UUID, url.ShortURL, url.OriginalURL)
-
-	return err
-}
-
 func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	URLId := strings.TrimPrefix(r.URL.Path, "/")
+	cfg := us.config
+	var originalURL string
+	var err error
+	if cfg.DataBaseConnString == "" {
+		// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
+		originalURL, err = us.Storage.GetURL(URLId)
+		if err != nil {
+			http.Error(w, "URL not found", http.StatusBadRequest)
+			return
+		}
+	} else {
 
-	// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
-	originalURL, err := us.Storage.GetURL(URLId)
-	if err != nil {
-		http.Error(w, "URL not found", http.StatusBadRequest)
+		db, err := us.GetDB()
+		if err != nil {
+			logger.Log.Error("Error connect to DB", zap.Error(err))
+		}
+		shortURL := cfg.BaseURL + r.URL.Path
+		originalURL, err = us.SelectURLData(db, shortURL)
+	}
+	// Выполняем перенаправление на оригинальный URL
+	fmt.Printf("select originalURL %s", originalURL)
+	w.Header().Set("Location", originalURL)
+	w.WriteHeader(http.StatusTemporaryRedirect)
+
+}
+
+func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Выполняем перенаправление на оригинальный URL
-	w.Header().Set("Location", originalURL)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	var req models.Request
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+	url := req.URL
+
+	id := us.GenerateID()
+	cfg := us.config
+	shortenedURL := cfg.BaseURL + "/" + id
+	fmt.Printf("ApiShorten  DSN %s \n", cfg.DataBaseConnString)
+	if cfg.DataBaseConnString == "" {
+		err := us.Storage.SaveMapURL(id, url)
+		if err != nil {
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		us.SaveToFile(urlData)
+	} else {
+		// заполняем структуру ShortenURL для записи в таблицу
+		shortenURL := &models.ShortenURL{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		_, err := us.SaveToDB(shortenURL)
+		if err != nil {
+			http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
+			return
+		}
+		// origURL, err := us.SelectURLData(db, shortenURL)
+		// fmt.Printf("select origURL %s", origURL)
+	}
+
+	resp := models.Response{
+		Result: shortenedURL,
+	}
+	jsonData, err := json.Marshal(&resp)
+	if err != nil {
+		http.Error(w, "error creating JSON response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	_, err = w.Write(jsonData)
+	if err != nil {
+		http.Error(w, "error writing response", http.StatusInternalServerError)
+	}
 }
 
 func (us *URLShortener) GenerateID() string {
