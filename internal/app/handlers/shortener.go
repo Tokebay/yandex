@@ -85,7 +85,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		ShortURL:    shortenedURL,
 		OriginalURL: string(url),
 	}
-
+	fmt.Printf("DSN %s; shortenURL %s \n", cfg.DataBaseConnString, shortenedURL)
 	if cfg.DataBaseConnString == "" {
 		// сохранение URL в мапу
 		fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
@@ -197,7 +197,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Error saving URL", http.StatusInternalServerError)
 			return
 		}
-
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),
 			ShortURL:    shortenedURL,
