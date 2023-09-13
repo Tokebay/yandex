@@ -85,10 +85,12 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		ShortURL:    shortenedURL,
 		OriginalURL: string(url),
 	}
-	fmt.Printf("DSN %s; shortenURL %s \n", cfg.DataBaseConnString, shortenedURL)
-	if cfg.DataBaseConnString == "" {
+	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DataBaseConnString, cfg.FileStoragePath)
+
+	if cfg.DataBaseConnString == "" && cfg.FileStoragePath != "" {
+		fmt.Println("Save to FILE")
 		// сохранение URL в мапу
-		fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 		err = us.Storage.SaveMapURL(id, string(url))
 		if err != nil {
 			logger.Log.Error("Error saving URL", zap.Error(err))
@@ -100,7 +102,9 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 			logger.Log.Error("Error saving URL data in file", zap.Error(err))
 			return
 		}
-	} else {
+	}
+	if cfg.DataBaseConnString != "" {
+		fmt.Println("Save to DB")
 		shortenURL := &models.ShortenURL{
 			UUID:        us.GenerateUUID(),
 			ShortURL:    shortenedURL,

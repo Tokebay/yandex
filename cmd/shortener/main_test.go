@@ -19,9 +19,10 @@ import (
 func TestURLShortener_shortenURLHandler(t *testing.T) {
 
 	cfg := &config.Config{
-		ServerAddress:   "localhost:8080",
-		BaseURL:         "http://localhost:8080",
-		FileStoragePath: "/tmp/short-url-db.json",
+		ServerAddress:      "localhost:8080",
+		BaseURL:            "http://localhost:8080",
+		FileStoragePath:    "/tmp/short-url-db.json",
+		DataBaseConnString: "host=127.0.0.1 port=5432 user=postgres password=postgres dbname=postgres sslmode=disable",
 	}
 	storage := *storage.NewMapStorage()
 	fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
