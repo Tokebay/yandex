@@ -29,12 +29,6 @@ type URLShortener struct {
 	URLDataSlice   []URLData
 }
 
-type URLData struct {
-	UUID        int    `json:"uuid"`
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
-}
-
 func (us *URLShortener) CloseFileStorage() error {
 	return us.fileStorage.Close() // Закрываем файл
 }
@@ -67,6 +61,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	cfg := us.config
 	url, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
@@ -80,30 +75,11 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	urlData := &URLData{
-		UUID:        us.GenerateUUID(),
-		ShortURL:    shortenedURL,
-		OriginalURL: string(url),
-	}
 	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
-	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DataBaseConnString, cfg.FileStoragePath)
+	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DSN, cfg.FileStoragePath)
+	// databaseDSN := os.Getenv("DATABASE_DSN")
 
-	if cfg.DataBaseConnString == "" && cfg.FileStoragePath != "" {
-		fmt.Println("Save to FILE")
-		// сохранение URL в мапу
-		err = us.Storage.SaveMapURL(id, string(url))
-		if err != nil {
-			logger.Log.Error("Error saving URL", zap.Error(err))
-			http.Error(w, "Error saving URL", http.StatusInternalServerError)
-			return
-		}
-
-		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-			logger.Log.Error("Error saving URL data in file", zap.Error(err))
-			return
-		}
-	}
-	if cfg.DataBaseConnString != "" {
+	if cfg.DSN != "" {
 		fmt.Println("Save to DB")
 		shortenURL := &models.ShortenURL{
 			UUID:        us.GenerateUUID(),
@@ -115,6 +91,27 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
 			return
 		}
+	} else {
+
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		fmt.Println("Save to FILE")
+		// сохранение URL в мапу
+		err = us.Storage.SaveURL(id, string(url))
+		if err != nil {
+			logger.Log.Error("Error saving URL", zap.Error(err))
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
+		}
+
 	}
 
 	fmt.Printf("Original URL: %s\n", url)
@@ -149,15 +146,7 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	cfg := us.config
 	var originalURL string
 	var err error
-	if cfg.DataBaseConnString == "" {
-		// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
-		originalURL, err = us.Storage.GetURL(URLId)
-		if err != nil {
-			http.Error(w, "URL not found", http.StatusBadRequest)
-			return
-		}
-	} else {
-
+	if cfg.DSN != "" {
 		db, err := us.GetDB()
 		if err != nil {
 			logger.Log.Error("Error connect to DB", zap.Error(err))
@@ -166,6 +155,14 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		originalURL, err = us.SelectURLData(db, shortURL)
 		if err != nil {
 			logger.Log.Error("Error get row from DB", zap.Error(err))
+		}
+
+	} else {
+		// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
+		originalURL, err = us.Storage.GetURL(URLId)
+		if err != nil {
+			http.Error(w, "URL not found", http.StatusBadRequest)
+			return
 		}
 	}
 	// Выполняем перенаправление на оригинальный URL
@@ -194,9 +191,9 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	id := us.GenerateID()
 	cfg := us.config
 	shortenedURL := cfg.BaseURL + "/" + id
-	fmt.Printf("ApiShorten  DSN %s \n", cfg.DataBaseConnString)
-	if cfg.DataBaseConnString == "" {
-		err := us.Storage.SaveMapURL(id, url)
+	fmt.Printf("ApiShorten  DSN %s \n", cfg.DSN)
+	if cfg.DSN == "" {
+		err := us.Storage.SaveURL(id, url)
 		if err != nil {
 			http.Error(w, "Error saving URL", http.StatusInternalServerError)
 			return

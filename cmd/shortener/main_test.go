@@ -19,10 +19,9 @@ import (
 func TestURLShortener_shortenURLHandler(t *testing.T) {
 
 	cfg := &config.Config{
-		ServerAddress:      "localhost:8080",
-		BaseURL:            "http://localhost:8080",
-		FileStoragePath:    "/tmp/short-url-db.json",
-		DataBaseConnString: "host=127.0.0.1 port=5432 user=postgres password=postgres dbname=postgres sslmode=disable",
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "/tmp/short-url-db.json",
 	}
 	storage := *storage.NewMapStorage()
 	fileStorage, err := handlers.NewProducer(cfg.FileStoragePath)
@@ -160,7 +159,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 		fileStorage,
 	)
 
-	storage.SaveMapURL("BpLnfgSfEr", "https://mail.ru/")
+	storage.SaveURL("BpLnfgSfEr", "https://mail.ru/")
 
 	type want struct {
 		statusCode  int

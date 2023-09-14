@@ -1,13 +1,18 @@
 package storage
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/Tokebay/yandex/internal/logger"
+	"github.com/Tokebay/yandex/internal/models"
+	"go.uber.org/zap"
 )
 
 type URLStorage interface {
-	SaveMapURL(id, url string) error
+	SaveURL(id, url string) error
 	GetURL(id string) (string, error)
 }
 
@@ -22,7 +27,7 @@ func NewMapStorage() *MapStorage {
 	}
 }
 
-func (ms *MapStorage) SaveMapURL(shortenURL, originalURL string) error {
+func (ms *MapStorage) SaveURL(shortenURL, originalURL string) error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
@@ -42,4 +47,72 @@ func (ms *MapStorage) GetURL(shortenURL string) (string, error) {
 		return "", errors.New("url not found")
 	}
 	return url, nil
+}
+
+type PostgreSQLStorage struct {
+	db *sql.DB
+}
+
+// NewPostgreSQLStorage новое PostgreSQL хранилище с заданным DSN
+func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
+
+	// Открываем соединение с базой данных
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		logger.Log.Error("Error open connection to DB", zap.Error(err))
+		return nil, err
+	}
+
+	// Проверяем соединение
+	if err := db.Ping(); err != nil {
+		db.Close()
+		logger.Log.Error("No ping to DB", zap.Error(err))
+		return nil, err
+	}
+
+	return &PostgreSQLStorage{db: db}, nil
+}
+
+// SaveURL сохраняет URL в PostgreSQL
+func (s *PostgreSQLStorage) SaveURL(shortURL, origURL string) error {
+	// сохранение URL в PostgreSQL
+
+	_, err := s.db.Exec(`
+        INSERT INTO shorten_urls (short_url, original_url)
+        VALUES ($2, $3)`,
+		shortURL, origURL)
+	if err != nil {
+		logger.Log.Error("Error insert URL", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+// GetURL получает URL из PostgreSQL
+func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
+	// получение URL из PostgreSQL
+	var url models.ShortenURL
+	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
+	err := row.Scan(&url.OriginalURL)
+	if err != nil {
+		logger.Log.Error("No row selected from table", zap.Error(err))
+		return "", err
+	}
+	return "", nil
+}
+
+func (s *PostgreSQLStorage) CreateTable() error {
+	// Создание таблицы в PostgreSQL
+	_, err := s.db.Exec(`
+	CREATE TABLE IF NOT EXISTS public.shorten_urls
+	(
+		uuid SERIAL,
+		short_url text COLLATE pg_catalog."default",
+		original_url text COLLATE pg_catalog."default"
+	)`)
+	if err != nil {
+		logger.Log.Error("Error occured create table", zap.Error(err))
+		return err
+	}
+	return nil
 }

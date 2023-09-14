@@ -2,17 +2,17 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"os"
 )
 
 type Config struct {
-	ServerAddress      string
-	BaseURL            string
-	ServerPort         string
-	FileStoragePath    string
-	DataBaseConnString string
-	DataBaseConn       DataBase
+	ServerAddress   string
+	BaseURL         string
+	ServerPort      string
+	FileStoragePath string
+	DSN             string
+	DataBaseConn    DataBase
+	UseDatabase     bool // использования базы данных
 }
 
 type DataBase struct {
@@ -31,29 +31,22 @@ func NewConfig() *Config {
 	flag.StringVar(&config.ServerPort, "p", "8080", "HTTP server port")
 	flag.StringVar(&config.FileStoragePath, "f", "/tmp/short-url-db.json", "Path to FILE_STORAGE_PATH")
 
-	// flag.StringVar(&config.DataBaseConn.DBName, "db_name", "postgres", "Database name")
-	// flag.StringVar(&config.DataBaseConn.Host, "db_host", "127.0.0.1", "Database host")
-	// flag.IntVar(&config.DataBaseConn.Port, "db_port", 5432, "Database port")
-	// flag.StringVar(&config.DataBaseConn.User, "db_user", "postgres", "Database user")
-	// flag.StringVar(&config.DataBaseConn.Password, "db_password", "postgres", "Database password")
+	// db := &DataBase{
+	// 	DBName:   "postgres",
+	// 	Host:     "127.0.0.1",
+	// 	Port:     5432,
+	// 	User:     "postgres",
+	// 	Password: "postgres",
+	// }
 
-	db := &DataBase{
-		DBName:   "postgres",
-		Host:     "127.0.0.1",
-		Port:     5432,
-		User:     "postgres",
-		Password: "postgres",
-	}
-
-	postgresConnString := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		db.Host, db.Port, db.User, db.Password, db.DBName)
 	// postgresConnString := fmt.Sprintf("host=%s port=%d user=%s "+
 	// 	"password=%s dbname=%s sslmode=disable",
-	// 	config.DataBaseConn.Host, config.DataBaseConn.Port, config.DataBaseConn.User,
-	// 	config.DataBaseConn.Password, config.DataBaseConn.DBName)
+	// 	db.Host, db.Port, db.User, db.Password, db.DBName)
 
-	flag.StringVar(&config.DataBaseConnString, "d", postgresConnString, "Database connection string DSN")
+	// flag.StringVar(&config.DataBaseConnString, "d", postgresConnString, "Database connection string DSN")
+
+	flag.StringVar(&config.DSN, "d", "", "Database DSN") // Добавляем флаг для строки подключения к БД
+	flag.BoolVar(&config.UseDatabase, "use-db", false, "Use PostgreSQL database")
 
 	flag.Parse()
 
@@ -80,7 +73,8 @@ func (c *Config) parseEnv() {
 		c.FileStoragePath = envFilePath
 	}
 
-	if envDBConnHost := os.Getenv("DATABASE_DSN"); envDBConnHost != "" {
-		c.DataBaseConnString = envDBConnHost
+	if envDBDSN := os.Getenv("DATABASE_DSN"); envDBDSN != "" {
+		c.DSN = envDBDSN
+		c.UseDatabase = true
 	}
 }

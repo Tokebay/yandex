@@ -39,7 +39,7 @@ func (us *URLShortener) CheckDBConnect(w http.ResponseWriter, r *http.Request) {
 
 func (us *URLShortener) GetDB() (*sql.DB, error) {
 
-	dbConnString := us.config.DataBaseConnString
+	dbConnString := us.config.DSN
 	fmt.Printf("dsn %s \n", dbConnString)
 	db, err := sql.Open("postgres", dbConnString)
 	if err != nil {
@@ -60,8 +60,7 @@ func CreateShortenedURLTable(db *sql.DB) error {
 	_, err := db.Exec(`
 	CREATE TABLE IF NOT EXISTS public.shorten_urls
 	(
-		id SERIAL PRIMARY KEY,
-		uuid text,
+		uuid SERIAL,
 		short_url text COLLATE pg_catalog."default",
 		original_url text COLLATE pg_catalog."default"
 	)`)
@@ -145,14 +144,6 @@ func (us *URLShortener) SaveToDB(shortenURL *models.ShortenURL) (*sql.DB, error)
 		logger.Log.Info("Error insert data to table", zap.Error(err))
 		return nil, err
 	}
-	//create table
-	// db, err := us.PostgresInit()
-	// if err != nil {
-	// 	logger.Log.Info("Error init DB connection", zap.Error(err))
-	// 	return err
-	// }
-	// insert data
-	// db.Create(&shortenURL)
 
 	return db, nil
 }

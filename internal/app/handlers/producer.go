@@ -16,6 +16,11 @@ type Producer struct {
 	filePath string
 	buffer   []URLData
 }
+type URLData struct {
+	UUID        int    `json:"uuid"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
 
 func NewProducer(filePath string) (*Producer, error) {
 
