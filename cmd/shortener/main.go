@@ -8,7 +8,7 @@ import (
 
 	"github.com/Tokebay/yandex/internal/app/handlers"
 	"github.com/Tokebay/yandex/internal/app/storage"
-	strg "github.com/Tokebay/yandex/internal/app/storage"
+
 	logger "github.com/Tokebay/yandex/internal/logger"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -27,7 +27,7 @@ func run() error {
 	// конфиг для запуска
 	cfg := config.NewConfig()
 
-	storage := storage.NewMapStorage()
+	mapStorage := storage.NewMapStorage()
 	// var storage storage.URLStorage
 	var fileStorage *handlers.Producer
 	var shortener *handlers.URLShortener
@@ -38,7 +38,7 @@ func run() error {
 		fmt.Println("connect to DB")
 
 		// Инициализировать и использовать PostgreSQL хранилище
-		dbStorage, err := strg.NewPostgreSQLStorage(cfg.DSN)
+		dbStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
 			logger.Log.Error("Error in NewPostgreSQLStorage", zap.Error(err))
 			return err
@@ -69,13 +69,13 @@ func run() error {
 
 		for _, urlData := range urlDataSlice {
 			// fmt.Printf("urlData.ShortURL %s;  urlData.OriginalUR %s \n", urlData.ShortURL, urlData.OriginalURL)
-			err := storage.SaveURL(urlData.ShortURL, urlData.OriginalURL)
+			err := mapStorage.SaveURL(urlData.ShortURL, urlData.OriginalURL)
 			if err != nil {
 				logger.Log.Error("Error saving URL to storage", zap.Error(err))
 				return err
 			}
 		}
-		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
+		shortener = handlers.NewURLShortener(cfg, mapStorage, fileStorage)
 	}
 
 	r := createRouter(shortener, cfg)
