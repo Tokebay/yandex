@@ -12,7 +12,6 @@ type Config struct {
 	FileStoragePath string
 	DSN             string
 	DataBaseConn    DataBase
-	UseDatabase     bool // использования базы данных
 }
 
 type DataBase struct {
@@ -31,22 +30,7 @@ func NewConfig() *Config {
 	flag.StringVar(&config.ServerPort, "p", "8080", "HTTP server port")
 	flag.StringVar(&config.FileStoragePath, "f", "/tmp/short-url-db.json", "Path to FILE_STORAGE_PATH")
 
-	// db := &DataBase{
-	// 	DBName:   "postgres",
-	// 	Host:     "127.0.0.1",
-	// 	Port:     5432,
-	// 	User:     "postgres",
-	// 	Password: "postgres",
-	// }
-
-	// postgresConnString := fmt.Sprintf("host=%s port=%d user=%s "+
-	// 	"password=%s dbname=%s sslmode=disable",
-	// 	db.Host, db.Port, db.User, db.Password, db.DBName)
-
-	// flag.StringVar(&config.DataBaseConnString, "d", postgresConnString, "Database connection string DSN")
-
 	flag.StringVar(&config.DSN, "d", "", "Database DSN") // Добавляем флаг для строки подключения к БД
-	flag.BoolVar(&config.UseDatabase, "use-db", false, "Use PostgreSQL database")
 
 	flag.Parse()
 
@@ -75,6 +59,5 @@ func (c *Config) parseEnv() {
 
 	if envDBDSN := os.Getenv("DATABASE_DSN"); envDBDSN != "" {
 		c.DSN = envDBDSN
-		c.UseDatabase = true
 	}
 }

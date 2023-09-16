@@ -52,8 +52,6 @@ func run() error {
 		shortener = handlers.NewURLShortener(cfg, dbStorage, nil)
 
 	} else {
-
-		// storage = storage.NewMapStorage()
 		fileStorage, err = handlers.NewProducer(cfg.FileStoragePath)
 		if err != nil {
 			logger.Log.Error("Error in NewProducer", zap.Error(err))

@@ -63,23 +63,16 @@ func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
 		return nil, err
 	}
 
-	// Проверяем соединение
-	if err := db.Ping(); err != nil {
-		db.Close()
-		logger.Log.Error("No ping to DB", zap.Error(err))
-		return nil, err
-	}
-
 	return &PostgreSQLStorage{db: db}, nil
 }
 
 // SaveURL сохраняет URL в PostgreSQL
-func (s *PostgreSQLStorage) SaveURL(shortURL, origURL string) error {
+func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	// сохранение URL в PostgreSQL
 
 	_, err := s.db.Exec(`
         INSERT INTO shorten_urls (short_url, original_url)
-        VALUES ($2, $3)`,
+        VALUES ($1, $2)`,
 		shortURL, origURL)
 	if err != nil {
 		logger.Log.Error("Error insert URL", zap.Error(err))
@@ -98,7 +91,8 @@ func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 		logger.Log.Error("No row selected from table", zap.Error(err))
 		return "", err
 	}
-	return "", nil
+
+	return url.OriginalURL, nil
 }
 
 func (s *PostgreSQLStorage) CreateTable() error {
@@ -107,8 +101,8 @@ func (s *PostgreSQLStorage) CreateTable() error {
 	CREATE TABLE IF NOT EXISTS public.shorten_urls
 	(
 		uuid SERIAL,
-		short_url text COLLATE pg_catalog."default",
-		original_url text COLLATE pg_catalog."default"
+		short_url text NOT NULL,
+		original_url text NOT NULL
 	)`)
 	if err != nil {
 		logger.Log.Error("Error occured create table", zap.Error(err))

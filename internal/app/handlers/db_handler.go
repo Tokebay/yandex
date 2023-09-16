@@ -46,15 +46,9 @@ func (us *URLShortener) GetDB() (*sql.DB, error) {
 		logger.Log.Error("Error open connection with DB", zap.Error(err))
 
 	}
-
-	err = db.Ping()
-	if err != nil {
-		logger.Log.Error("Error establishing connection with DB", zap.Error(err))
-		return nil, err
-	}
-
 	return db, nil
 }
+
 func CreateShortenedURLTable(db *sql.DB) error {
 	// Создаем таблицу shortened_urls, если она еще не существует
 	_, err := db.Exec(`
@@ -70,51 +64,12 @@ func CreateShortenedURLTable(db *sql.DB) error {
 	return nil
 }
 
-// func (us *URLShortener) GetOriginDBURL(shortenURL string) (string, error) {
-// 	db, err := us.PostgresInit()
-// 	if err != nil {
-// 		logger.Log.Error("Error connect to DB", zap.Error(err))
-// 		return "", err
-// 	}
-// 	// Get  matched record
-// 	var url models.ShortenURL
-// 	if err := db.Select("original_url").Where("short_url = ?", &shortenURL).First(&url).Error; err != nil {
-// 		return "", err
-// 	}
-
-// 	return url.OriginalURL, nil
-// }
-
-// func (us *URLShortener) PostgresInit() (*gorm.DB, error) {
-
-// 	dsn := us.config.DataBaseConnString
-// 	// fmt.Printf("dsn %s \n", dsn)
-// 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-// 	if err != nil {
-// 		logger.Log.Error("Error establishing connection with DB", zap.Error(err))
-// 		return nil, err
-// 	}
-
-// 	return db, err
-// }
-
-// func (us *URLShortener) CreateTable() (*gorm.DB, error) {
-
-// 	db, err := us.PostgresInit()
-// 	if err != nil {
-// 		logger.Log.Error("Error connect to DB", zap.Error(err))
-// 		return nil, err
-// 	}
-// 	db.AutoMigrate(&models.ShortenURL{})
-// 	return db, nil
-// }
-
 func (us *URLShortener) InsertData(db *sql.DB, url *models.ShortenURL) error {
 
 	_, err := db.Exec(`
-        INSERT INTO shorten_urls (uuid, short_url, original_url)
-        VALUES ($1, $2, $3)`,
-		url.UUID, url.ShortURL, url.OriginalURL)
+        INSERT INTO shorten_urls (short_url, original_url)
+        VALUES ($1, $2)`,
+		url.ShortURL, url.OriginalURL)
 
 	return err
 }

@@ -81,16 +81,19 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	if cfg.DSN != "" {
 		fmt.Println("Save to DB")
-		shortenURL := &models.ShortenURL{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
-		}
-		_, err := us.SaveToDB(shortenURL)
+
+		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
-			http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
+
+		err = pgStorage.SaveURL(shortenedURL, string(url))
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
 	} else {
 
 		urlData := &URLData{
@@ -147,12 +150,15 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	var originalURL string
 	var err error
 	if cfg.DSN != "" {
-		db, err := us.GetDB()
-		if err != nil {
-			logger.Log.Error("Error connect to DB", zap.Error(err))
-		}
 		shortURL := cfg.BaseURL + r.URL.Path
-		originalURL, err = us.SelectURLData(db, shortURL)
+
+		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		originalURL, err = pgStorage.GetURL(shortURL)
 		if err != nil {
 			logger.Log.Error("Error get row from DB", zap.Error(err))
 		}
@@ -193,17 +199,17 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	shortenedURL := cfg.BaseURL + "/" + id
 	fmt.Printf("ApiShorten  DSN %s \n", cfg.DSN)
 	if cfg.DSN == "" {
-		err := us.Storage.SaveURL(id, url)
+		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
-			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		urlData := &URLData{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
+
+		err = pgStorage.SaveURL(shortenedURL, string(url))
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
 		}
-		us.SaveToFile(urlData)
 	} else {
 		// заполняем структуру ShortenURL для записи в таблицу
 		shortenURL := &models.ShortenURL{
