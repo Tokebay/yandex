@@ -90,11 +90,11 @@ func TestApiShortenerURL(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := handlers.NewURLShortener(cfg, &storage, fileStorage)
 
+	shortener := handlers.NewURLShortener(cfg, &storage, fileStorage)
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
-		return "EwHXdJfB"
+		return "EwHXdJfC"
 	})
 
 	type want struct {
@@ -116,7 +116,7 @@ func TestApiShortenerURL(t *testing.T) {
 			want: want{
 				contentType:  "application/json",
 				statusCode:   201,
-				expectedBody: `{"result":"http://localhost:8080/EwHXdJfB"}`,
+				expectedBody: `{"result":"http://localhost:8080/EwHXdJfC"}`,
 			},
 		},
 	}

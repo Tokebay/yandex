@@ -199,6 +199,25 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	shortenedURL := cfg.BaseURL + "/" + id
 	fmt.Printf("ApiShorten  DSN %s \n", cfg.DSN)
 	if cfg.DSN == "" {
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		// сохранение URL в мапу
+		err := us.Storage.SaveURL(id, string(url))
+		if err != nil {
+			logger.Log.Error("Error saving URL", zap.Error(err))
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
+		}
+	} else {
+		// заполняем структуру ShortenURL для записи в таблицу
 		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -210,20 +229,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-	} else {
-		// заполняем структуру ShortenURL для записи в таблицу
-		shortenURL := &models.ShortenURL{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
-		}
-		_, err := us.SaveToDB(shortenURL)
-		if err != nil {
-			http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
-			return
-		}
-		// origURL, err := us.SelectURLData(db, shortenURL)
-		// fmt.Printf("select origURL %s", origURL)
 	}
 
 	resp := models.Response{
