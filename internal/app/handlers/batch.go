@@ -6,20 +6,9 @@ import (
 
 	"github.com/Tokebay/yandex/internal/app/storage"
 	"github.com/Tokebay/yandex/internal/logger"
+	"github.com/Tokebay/yandex/internal/models"
 	"go.uber.org/zap"
 )
-
-// request
-type BatchShortenRequest []struct {
-	CorrelationID string `json:"correlation_id"`
-	OriginalURL   string `json:"original_url"`
-}
-
-// response
-type BatchShortenResponse []struct {
-	CorrelationID string `json:"correlation_id"`
-	ShortURL      string `json:"short_url"`
-}
 
 func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -29,7 +18,7 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 
 	cfg := us.config
 
-	var req BatchShortenRequest
+	var req models.BatchShortenRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&req); err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
@@ -37,14 +26,13 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 	}
 	defer r.Body.Close()
 
-	var resp BatchShortenResponse
+	var resp models.BatchShortenResponse
 	for _, url := range req {
 		id := us.GenerateID()
 		shortenedURL := cfg.BaseURL + "/" + id
 
 		// fmt.Printf("id %s ; origURL %s;  \n", url.CorrelationID, url.OriginalURL)
 		if cfg.DSN != "" {
-			// fmt.Println("api/batch Save in DB")
 			pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 			if err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -64,7 +52,6 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 				OriginalURL: url.OriginalURL,
 			}
 
-			// fmt.Println("api/batch Save in FILE")
 			err := us.Storage.SaveURL(id, url.OriginalURL)
 			if err != nil {
 				http.Error(w, "Error saving URL", http.StatusInternalServerError)

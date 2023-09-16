@@ -84,7 +84,7 @@ func (us *URLShortener) SelectURLData(db *sql.DB, shortURL string) (string, erro
 		logger.Log.Error("Error select row from DB", zap.Error(err))
 		return "", err
 	}
-	fmt.Printf("selectURL url.OriginalURL %s \n", url.OriginalURL)
+	// fmt.Printf("selectURL url.OriginalURL %s \n", url.OriginalURL)
 	return url.OriginalURL, nil
 }
 

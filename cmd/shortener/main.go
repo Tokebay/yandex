@@ -28,7 +28,6 @@ func run() error {
 	cfg := config.NewConfig()
 
 	mapStorage := storage.NewMapStorage()
-	// var storage storage.URLStorage
 	var fileStorage *handlers.Producer
 	var shortener *handlers.URLShortener
 	var err error
