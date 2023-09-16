@@ -226,7 +226,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 
 		err = pgStorage.SaveURL(shortenedURL, string(url))
 		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
 			return
 		}
 	}
