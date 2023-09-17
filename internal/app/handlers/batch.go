@@ -46,7 +46,7 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 			fmt.Println("existURL ", existURL)
 			if existURL == "" {
 				err := pgStorage.SaveURL(shortenedURL, url.OriginalURL)
-				if errors.Is(err, storage.URLAlreadyExist) {
+				if errors.Is(err, storage.ErrAlreadyExistURL) {
 					httpStatusCode = http.StatusConflict
 				}
 			} else {

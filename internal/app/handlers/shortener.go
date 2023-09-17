@@ -93,7 +93,7 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		fmt.Println("existURL ", existURL)
 		if existURL == "" {
 			err := pgStorage.SaveURL(shortenedURL, string(url))
-			if errors.Is(err, storage.URLAlreadyExist) {
+			if errors.Is(err, storage.ErrAlreadyExistURL) {
 				httpStatusCode = http.StatusConflict
 			}
 		} else {
@@ -220,7 +220,7 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		fmt.Println("existURL ", existURL)
 		if existURL == "" {
 			err := pgStorage.SaveURL(shortenedURL, string(url))
-			if errors.Is(err, storage.URLAlreadyExist) {
+			if errors.Is(err, storage.ErrAlreadyExistURL) {
 				httpStatusCode = http.StatusConflict
 			}
 		} else {

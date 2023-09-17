@@ -66,7 +66,7 @@ func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
 	return &PostgreSQLStorage{db: db}, nil
 }
 
-var URLAlreadyExist = errors.New("URLAlreadyExist")
+var ErrAlreadyExistURL = errors.New("URLAlreadyExist")
 
 func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	// сохранение URL в PostgreSQL
@@ -81,7 +81,7 @@ func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		fmt.Println("rowsAffected ", rowsAffected)
-		return URLAlreadyExist
+		return ErrAlreadyExistURL
 	}
 	return nil
 }
