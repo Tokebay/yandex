@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/Tokebay/yandex/internal/app/storage"
@@ -25,8 +27,9 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 	defer r.Body.Close()
-
 	var resp models.BatchShortenResponse
+	httpStatusCode := http.StatusCreated
+
 	for _, url := range req {
 		id := us.GenerateID()
 		shortenedURL := cfg.BaseURL + "/" + id
@@ -38,11 +41,16 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
-
-			err = pgStorage.SaveURL(shortenedURL, url.OriginalURL)
-			if err != nil {
-				http.Error(w, "Error saving URL in DB", http.StatusInternalServerError)
-				return
+			existURL, err := pgStorage.ExistOrigURL(url.OriginalURL)
+			fmt.Println("existURL ", existURL)
+			if existURL == "" {
+				err := pgStorage.SaveURL(shortenedURL, url.OriginalURL)
+				if errors.Is(err, storage.URLAlreadyExist) {
+					httpStatusCode = http.StatusConflict
+				}
+			} else {
+				shortenedURL = existURL
+				httpStatusCode = http.StatusConflict
 			}
 
 		} else {
@@ -71,7 +79,7 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(httpStatusCode)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		http.Error(w, "Error encoding JSON response", http.StatusInternalServerError)
 	}

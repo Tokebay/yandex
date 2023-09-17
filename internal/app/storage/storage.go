@@ -66,19 +66,40 @@ func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
 	return &PostgreSQLStorage{db: db}, nil
 }
 
-// SaveURL сохраняет URL в PostgreSQL
+var URLAlreadyExist = errors.New("URLAlreadyExist")
+
 func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	// сохранение URL в PostgreSQL
 
-	_, err := s.db.Exec(`
-        INSERT INTO shorten_urls (short_url, original_url)
-        VALUES ($1, $2)`,
+	result, err := s.db.Exec(`INSERT INTO shorten_urls (short_url,original_url) VALUES ($1, $2) ON CONFLICT (original_url) DO NOTHING RETURNING short_url;`,
 		shortURL, origURL)
 	if err != nil {
-		logger.Log.Error("Error insert URL", zap.Error(err))
+		logger.Log.Error("Error insert URL to table", zap.Error(err))
 		return err
 	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		fmt.Println("rowsAffected ", rowsAffected)
+		return URLAlreadyExist
+	}
 	return nil
+}
+
+func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, error) {
+	// сохранение URL в PostgreSQL
+	query := `INSERT INTO shorten_urls (short_url,original_url) VALUES ($1, $2) ON CONFLICT (original_url) DO NOTHING RETURNING short_url;`
+
+	var existingShortURL sql.NullString
+	err := s.db.QueryRow(query, shortURL, origURL).Scan(&existingShortURL)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+
+	if existingShortURL.Valid {
+		return existingShortURL.String, nil
+	}
+	return shortURL, nil
 }
 
 // GetURL получает URL из PostgreSQL
@@ -95,6 +116,15 @@ func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 	return url.OriginalURL, nil
 }
 
+func (s *PostgreSQLStorage) ExistOrigURL(origURL string) (string, error) {
+	var url models.ShortenURL
+	err := s.db.QueryRow("SELECT short_url FROM shorten_urls WHERE original_url = $1", origURL).Scan(&url.ShortURL)
+	if err != nil {
+		return "", err
+	}
+	return url.ShortURL, nil
+}
+
 func (s *PostgreSQLStorage) CreateTable() error {
 	// Создание таблицы в PostgreSQL
 	_, err := s.db.Exec(`
@@ -103,7 +133,9 @@ func (s *PostgreSQLStorage) CreateTable() error {
 		uuid SERIAL,
 		short_url text NOT NULL,
 		original_url text NOT NULL
-	)`)
+	);
+	CREATE UNIQUE INDEX original_url_index ON shorten_urls (original_url);
+	`)
 	if err != nil {
 		logger.Log.Error("Error occured create table", zap.Error(err))
 		return err
