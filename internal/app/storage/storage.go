@@ -116,13 +116,13 @@ func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 	return url.OriginalURL, nil
 }
 
-func (s *PostgreSQLStorage) ExistOrigURL(origURL string) (string, error) {
+func (s *PostgreSQLStorage) ExistOrigURL(origURL string) string {
 	var url models.ShortenURL
 	err := s.db.QueryRow("SELECT short_url FROM shorten_urls WHERE original_url = $1", origURL).Scan(&url.ShortURL)
 	if err != nil {
-		return "", err
+		return ""
 	}
-	return url.ShortURL, nil
+	return url.ShortURL
 }
 
 func (s *PostgreSQLStorage) CreateTable() error {
@@ -133,12 +133,48 @@ func (s *PostgreSQLStorage) CreateTable() error {
 		uuid SERIAL,
 		short_url text NOT NULL,
 		original_url text NOT NULL
-	);
-	CREATE UNIQUE INDEX original_url_index ON shorten_urls (original_url);
-	`)
+	)`)
 	if err != nil {
 		logger.Log.Error("Error occured create table", zap.Error(err))
 		return err
 	}
+
+	indexName := "original_url_index"
+
+	// Проверяем существование индекса
+	exists, err := s.indexExists(indexName)
+	if err != nil {
+		logger.Log.Error("Error create index", zap.Error(err))
+		return err
+	}
+	fmt.Println("indexExist", exists)
+	// Если индекс не существует, создаем его
+	if !exists {
+		createIndexSQL := fmt.Sprintf("CREATE UNIQUE INDEX %s ON shorten_urls (original_url)", indexName)
+		_, err := s.db.Exec(createIndexSQL)
+		if err != nil {
+			logger.Log.Error("Error create index", zap.Error(err))
+			return err
+		}
+
+	}
+
 	return nil
+}
+
+func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_indexes
+			WHERE indexname = $1
+		)`
+
+	var exists bool
+	err := s.db.QueryRow(query, indexName).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
 }

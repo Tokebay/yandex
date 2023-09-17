@@ -41,7 +41,8 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
-			existURL, err := pgStorage.ExistOrigURL(url.OriginalURL)
+			existURL := pgStorage.ExistOrigURL(url.OriginalURL)
+
 			fmt.Println("existURL ", existURL)
 			if existURL == "" {
 				err := pgStorage.SaveURL(shortenedURL, url.OriginalURL)

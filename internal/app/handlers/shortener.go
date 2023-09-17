@@ -88,7 +88,8 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		existURL, err := pgStorage.ExistOrigURL(string(url))
+		existURL := pgStorage.ExistOrigURL(string(url))
+
 		fmt.Println("existURL ", existURL)
 		if existURL == "" {
 			err := pgStorage.SaveURL(shortenedURL, string(url))
@@ -209,10 +210,13 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 		// заполняем структуру ShortenURL для записи в таблицу
 		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
+			logger.Log.Error("Error get existing URL", zap.Error(err))
+		}
+		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		existURL, err := pgStorage.ExistOrigURL(string(url))
+		existURL := pgStorage.ExistOrigURL(string(url))
 		fmt.Println("existURL ", existURL)
 		if existURL == "" {
 			err := pgStorage.SaveURL(shortenedURL, string(url))
