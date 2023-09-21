@@ -103,7 +103,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 			}
 		}
 
-		fmt.Printf("newURL %s ,oldURL %s \n", shortURL, shortenedURL)
 		shortenedURL = shortURL
 
 	} else {
