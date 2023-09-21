@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/Tokebay/yandex/internal/app/storage"
@@ -36,23 +34,22 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 
 		// fmt.Printf("id %s ; origURL %s;  \n", url.CorrelationID, url.OriginalURL)
 		if cfg.DSN != "" {
-			pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+			pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN, us.dbPool)
 			if err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
-			existURL := pgStorage.ExistOrigURL(url.OriginalURL)
-
-			fmt.Println("existURL ", existURL)
-			if existURL == "" {
-				err := pgStorage.SaveURL(shortenedURL, url.OriginalURL)
-				if errors.Is(err, storage.ErrAlreadyExistURL) {
-					httpStatusCode = http.StatusConflict
-				}
-			} else {
-				shortenedURL = existURL
+			shortURL, err := pgStorage.InsertURL(shortenedURL, url.OriginalURL)
+			if err != nil && shortURL == "" {
 				httpStatusCode = http.StatusConflict
+				shortURL, err = pgStorage.GetShortURL(url.OriginalURL)
+				if err != nil {
+					logger.Log.Error("Error get Original URL", zap.Error(err))
+					return
+				}
 			}
+
+			shortenedURL = shortURL
 
 		} else {
 			urlData := &URLData{

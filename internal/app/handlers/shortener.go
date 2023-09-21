@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/Tokebay/yandex/config"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/Tokebay/yandex/internal/app/storage"
 	"github.com/Tokebay/yandex/internal/logger"
@@ -28,6 +28,7 @@ type URLShortener struct {
 	uuidCounter    int // счетчик UUID
 	uuidMu         sync.Mutex
 	URLDataSlice   []URLData
+	dbPool         *pgxpool.Pool
 }
 
 func (us *URLShortener) CloseFileStorage() error {
@@ -47,9 +48,10 @@ func (us *URLShortener) GenerateUUID() int {
 	return us.uuidCounter
 }
 
-func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage *Producer) *URLShortener {
+func NewURLShortener(cfg *config.Config, dbPool *pgxpool.Pool, storage storage.URLStorage, fileStorage *Producer) *URLShortener {
 	us := &URLShortener{
 		config:      cfg,
+		dbPool:      dbPool,
 		Storage:     storage,
 		fileStorage: fileStorage,
 		uuidCounter: 0,
@@ -83,23 +85,26 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	if cfg.DSN != "" {
 		fmt.Println("Save to DB")
 
-		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN, us.dbPool)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		existURL := pgStorage.ExistOrigURL(string(url))
+		//existURL := pgStorage.ExistOrigURL(string(url))
+		//fmt.Println("existURL ", existURL)
 
-		fmt.Println("existURL ", existURL)
-		if existURL == "" {
-			err := pgStorage.SaveURL(shortenedURL, string(url))
-			if errors.Is(err, storage.ErrAlreadyExistURL) {
-				httpStatusCode = http.StatusConflict
-			}
-		} else {
-			shortenedURL = existURL
+		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		if err != nil && shortURL == "" {
 			httpStatusCode = http.StatusConflict
+			shortURL, err = pgStorage.GetShortURL(string(url))
+			if err != nil {
+				logger.Log.Error("Error get Original URL", zap.Error(err))
+				return
+			}
 		}
+
+		fmt.Printf("newURL %s ,oldURL %s \n", shortURL, shortenedURL)
+		shortenedURL = shortURL
 
 	} else {
 
@@ -159,7 +164,7 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	if cfg.DSN != "" {
 		shortURL := cfg.BaseURL + r.URL.Path
 
-		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN, us.dbPool)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -208,25 +213,23 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	httpStatusCode := http.StatusCreated
 	if cfg.DSN != "" {
 		// заполняем структуру ShortenURL для записи в таблицу
-		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
-		if err != nil {
-			logger.Log.Error("Error get existing URL", zap.Error(err))
-		}
+		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN, us.dbPool)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		existURL := pgStorage.ExistOrigURL(string(url))
-		fmt.Println("existURL ", existURL)
-		if existURL == "" {
-			err := pgStorage.SaveURL(shortenedURL, string(url))
-			if errors.Is(err, storage.ErrAlreadyExistURL) {
-				httpStatusCode = http.StatusConflict
-			}
-		} else {
-			shortenedURL = existURL
+
+		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		if err != nil && shortURL == "" {
 			httpStatusCode = http.StatusConflict
+			shortURL, err = pgStorage.GetShortURL(string(url))
+			if err != nil {
+				logger.Log.Error("Error get Original URL", zap.Error(err))
+				return
+			}
 		}
+		shortenedURL = shortURL
+
 	} else {
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),

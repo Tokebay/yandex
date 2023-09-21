@@ -29,7 +29,7 @@ func TestURLShortener_shortenURLHandler(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer fileStorage.Close()
-	shortener := handlers.NewURLShortener(cfg, &storage, fileStorage)
+	shortener := handlers.NewURLShortener(cfg, nil, &storage, fileStorage)
 
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
@@ -91,7 +91,7 @@ func TestApiShortenerURL(t *testing.T) {
 	}
 	defer fileStorage.Close()
 
-	shortener := handlers.NewURLShortener(cfg, &storage, fileStorage)
+	shortener := handlers.NewURLShortener(cfg, nil, &storage, fileStorage)
 	// Устанавливаем функцию генерации идентификатора для тестов
 	shortener.SetGenerateIDFunc(func() string {
 		return "EwHXdJfC"
@@ -155,6 +155,7 @@ func TestRedirectURLHandler_redirectURLHandler(t *testing.T) {
 
 	shortener := handlers.NewURLShortener(
 		cfg,
+		nil,
 		storage,
 		fileStorage,
 	)

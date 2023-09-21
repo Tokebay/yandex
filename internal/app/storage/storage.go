@@ -1,13 +1,15 @@
 package storage
 
 import (
-	"database/sql"
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/Tokebay/yandex/internal/logger"
 	"github.com/Tokebay/yandex/internal/models"
+	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 )
 
@@ -50,20 +52,11 @@ func (ms *MapStorage) GetURL(shortenURL string) (string, error) {
 }
 
 type PostgreSQLStorage struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-// NewPostgreSQLStorage новое PostgreSQL хранилище с заданным DSN
-func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
-
-	// Открываем соединение с базой данных
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		logger.Log.Error("Error open connection to DB", zap.Error(err))
-		return nil, err
-	}
-
-	return &PostgreSQLStorage{db: db}, nil
+func NewPostgreSQLStorage(dsn string, dbPool *pgxpool.Pool) (*PostgreSQLStorage, error) {
+	return &PostgreSQLStorage{db: dbPool}, nil
 }
 
 var ErrAlreadyExistURL = errors.New("URLAlreadyExist")
@@ -71,42 +64,57 @@ var ErrAlreadyExistURL = errors.New("URLAlreadyExist")
 func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	// сохранение URL в PostgreSQL
 
-	result, err := s.db.Exec(`INSERT INTO shorten_urls (short_url,original_url) VALUES ($1, $2) ON CONFLICT (original_url) DO NOTHING RETURNING short_url;`,
-		shortURL, origURL)
+	// Сперва создадим контекст
+	ctx := context.Background()
+
+	// Запрос использует RETURNING, поэтому нам нужно предоставить переменную для получения результата
+	var returnedShortURL string
+
+	// Выполним запрос с помощью pgx
+	err := s.db.QueryRow(ctx, `
+		 INSERT INTO shorten_urls (short_url, original_url)
+		 VALUES ($1, $2)
+		 ON CONFLICT (original_url) DO NOTHING
+		 RETURNING short_url
+	 `, shortURL, origURL).Scan(&returnedShortURL)
+
 	if err != nil {
+		if err == pgx.ErrNoRows { // если ON CONFLICT не сработал и ни одна строка не вернулась
+			fmt.Println("rowsAffected 0")
+			return ErrAlreadyExistURL
+		}
 		logger.Log.Error("Error insert URL to table", zap.Error(err))
 		return err
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		fmt.Println("rowsAffected ", rowsAffected)
-		return ErrAlreadyExistURL
-	}
 	return nil
 }
 
 func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, error) {
-	// сохранение URL в PostgreSQL
-	query := `INSERT INTO shorten_urls (short_url,original_url) VALUES ($1, $2) ON CONFLICT (original_url) DO NOTHING RETURNING short_url;`
+	ctx := context.Background()
 
-	var existingShortURL sql.NullString
-	err := s.db.QueryRow(query, shortURL, origURL).Scan(&existingShortURL)
-	if err != nil && err != sql.ErrNoRows {
+	var existingShortURL string
+
+	err := s.db.QueryRow(ctx, `
+	    INSERT INTO shorten_urls (short_url, original_url)
+	    VALUES ($1, $2)
+	    ON CONFLICT (original_url) DO NOTHING
+	    RETURNING short_url`, shortURL, origURL).Scan(&existingShortURL)
+
+	if err != nil {
+		logger.Log.Error("Error Insert URL to table", zap.Error(err))
 		return "", err
 	}
 
-	if existingShortURL.Valid {
-		return existingShortURL.String, nil
-	}
-	return shortURL, nil
+	return existingShortURL, nil
 }
 
 // GetURL получает URL из PostgreSQL
 func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
+	ctx := context.Background()
 	// получение URL из PostgreSQL
 	var url models.ShortenURL
-	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
+	row := s.db.QueryRow(ctx, "SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
 	err := row.Scan(&url.OriginalURL)
 	if err != nil {
 		logger.Log.Error("No row selected from table", zap.Error(err))
@@ -116,24 +124,28 @@ func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 	return url.OriginalURL, nil
 }
 
-func (s *PostgreSQLStorage) ExistOrigURL(origURL string) string {
+func (s *PostgreSQLStorage) GetShortURL(origURL string) (string, error) {
+	ctx := context.Background()
 	var url models.ShortenURL
-	err := s.db.QueryRow("SELECT short_url FROM shorten_urls WHERE original_url = $1", origURL).Scan(&url.ShortURL)
+	err := s.db.QueryRow(ctx, "SELECT short_url FROM shorten_urls WHERE original_url = $1", origURL).Scan(&url.ShortURL)
 	if err != nil {
-		return ""
+		logger.Log.Error("Error in GetOrigURL. short_url", zap.Error(err))
+		return "", err
 	}
-	return url.ShortURL
+	return url.ShortURL, nil
 }
 
 func (s *PostgreSQLStorage) CreateTable() error {
 	// Создание таблицы в PostgreSQL
-	_, err := s.db.Exec(`
-	CREATE TABLE IF NOT EXISTS public.shorten_urls
-	(
-		uuid SERIAL,
-		short_url text NOT NULL,
-		original_url text NOT NULL
-	)`)
+	ctx := context.Background()
+	_, err := s.db.Exec(ctx,
+		`CREATE TABLE IF NOT EXISTS public.shorten_urls
+		(
+			uuid SERIAL,
+			short_url text NOT NULL,
+			original_url text NOT NULL
+		)`)
+
 	if err != nil {
 		logger.Log.Error("Error occured create table", zap.Error(err))
 		return err
@@ -151,7 +163,7 @@ func (s *PostgreSQLStorage) CreateTable() error {
 	// Если индекс не существует, создаем его
 	if !exists {
 		createIndexSQL := fmt.Sprintf("CREATE UNIQUE INDEX %s ON shorten_urls (original_url)", indexName)
-		_, err := s.db.Exec(createIndexSQL)
+		_, err := s.db.Exec(ctx, createIndexSQL)
 		if err != nil {
 			logger.Log.Error("Error create index", zap.Error(err))
 			return err
@@ -163,6 +175,7 @@ func (s *PostgreSQLStorage) CreateTable() error {
 }
 
 func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
+	ctx := context.Background()
 	query := `
 		SELECT EXISTS (
 			SELECT 1
@@ -171,7 +184,7 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 		)`
 
 	var exists bool
-	err := s.db.QueryRow(query, indexName).Scan(&exists)
+	err := s.db.QueryRow(ctx, query, indexName).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
