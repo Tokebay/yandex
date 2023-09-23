@@ -34,7 +34,7 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 
 		// fmt.Printf("id %s ; origURL %s;  \n", url.CorrelationID, url.OriginalURL)
 		if cfg.DSN != "" {
-			pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN, us.dbPool)
+			pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 			if err != nil {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return

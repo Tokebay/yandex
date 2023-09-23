@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/Tokebay/yandex/config"
-	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/Tokebay/yandex/internal/app/handlers"
 	"github.com/Tokebay/yandex/internal/app/storage"
@@ -37,27 +35,21 @@ func run() error {
 
 	if cfg.DSN != "" {
 		fmt.Println("connect to DB")
-		// создаю пул соединений
-		dbPool, err := pgxpool.Connect(context.Background(), cfg.DSN)
-		if err != nil {
-			logger.Log.Error("Error connecting to the database: %v", zap.Error(err))
-		}
-		defer dbPool.Close()
+		// // создаю пул соединений
+		// dbPool, err := pgxpool.Connect(context.Background(), cfg.DSN)
+		// if err != nil {
+		// 	logger.Log.Error("Error connecting to the database: %v", zap.Error(err))
+		// }
+		// defer dbPool.Close()
 
 		// Инициализировать и использовать PostgreSQL хранилище
-		dbStorage, err := storage.NewPostgreSQLStorage(cfg.DSN, dbPool)
+		dbStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
 			logger.Log.Error("Error in NewPostgreSQLStorage", zap.Error(err))
 			return err
 		}
 
-		err = dbStorage.MigrateTable(cfg.DSN)
-		if err != nil {
-			logger.Log.Error("Error migrate", zap.Error(err))
-			return err
-		}
-
-		shortener = handlers.NewURLShortener(cfg, dbPool, dbStorage, nil)
+		shortener = handlers.NewURLShortener(cfg, dbStorage, nil)
 
 	} else {
 		fileStorage, err = handlers.NewProducer(cfg.FileStoragePath)
@@ -81,7 +73,7 @@ func run() error {
 				return err
 			}
 		}
-		shortener = handlers.NewURLShortener(cfg, nil, mapStorage, fileStorage)
+		shortener = handlers.NewURLShortener(cfg, mapStorage, fileStorage)
 	}
 
 	r := createRouter(shortener, cfg)

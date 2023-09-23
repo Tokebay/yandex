@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"github.com/Tokebay/yandex/internal/logger"
 	"github.com/Tokebay/yandex/internal/models"
 	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose"
 	"go.uber.org/zap"
@@ -55,26 +53,47 @@ func (ms *MapStorage) GetURL(shortenURL string) (string, error) {
 }
 
 type PostgreSQLStorage struct {
-	db *pgxpool.Pool
+	db *sql.DB
 }
 
-func NewPostgreSQLStorage(dsn string, dbPool *pgxpool.Pool) (*PostgreSQLStorage, error) {
-	return &PostgreSQLStorage{db: dbPool}, nil
+func (s *PostgreSQLStorage) Close() error {
+	if s.db != nil {
+		err := s.db.Close()
+		if err != nil {
+			logger.Log.Error("Error closing database connection", zap.Error(err))
+			return err
+		}
+	}
+	return nil
+}
+
+func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
+	// Выполнить миграции
+	db, err := goose.OpenDBWithDriver("postgres", dsn)
+	if err != nil {
+		logger.Log.Error("Error open conn", zap.Error(err))
+		return nil, err
+	}
+	err = goose.Up(db, "./database/migration")
+	if err != nil {
+		logger.Log.Error("Error goose UP", zap.Error(err))
+		return nil, err
+	}
+
+	// Вернуть созданный объект PostgreSQLStorage
+	return &PostgreSQLStorage{db: db}, nil
 }
 
 var ErrAlreadyExistURL = errors.New("URLAlreadyExist")
 
 func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
-	// сохранение URL в PostgreSQL
-
-	// Сперва создадим контекст
-	ctx := context.Background()
+	// ctx := context.Background()
 
 	// Запрос использует RETURNING, поэтому нам нужно предоставить переменную для получения результата
 	var returnedShortURL string
 
 	// Выполним запрос с помощью pgx
-	err := s.db.QueryRow(ctx, `
+	err := s.db.QueryRow(`
 		 INSERT INTO shorten_urls (short_url, original_url)
 		 VALUES ($1, $2)
 		 ON CONFLICT (original_url) DO NOTHING
@@ -94,11 +113,11 @@ func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 }
 
 func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, error) {
-	ctx := context.Background()
+	// ctx := context.Background()
 
 	var existingShortURL string
 
-	err := s.db.QueryRow(ctx, `
+	err := s.db.QueryRow(`
 	    INSERT INTO shorten_urls (short_url, original_url)
 	    VALUES ($1, $2)
 	    ON CONFLICT (original_url) DO NOTHING
@@ -114,9 +133,9 @@ func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, 
 
 // GetURL получает URL из PostgreSQL
 func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
-	ctx := context.Background()
+	// ctx := context.Background()
 	var url models.ShortenURL
-	row := s.db.QueryRow(ctx, "SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
+	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
 	err := row.Scan(&url.OriginalURL)
 	if err != nil {
 		logger.Log.Error("No row selected from table", zap.Error(err))
@@ -127,9 +146,9 @@ func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 }
 
 func (s *PostgreSQLStorage) GetShortURL(origURL string) (string, error) {
-	ctx := context.Background()
+	// ctx := context.Background()
 	var url models.ShortenURL
-	err := s.db.QueryRow(ctx, "SELECT short_url FROM shorten_urls WHERE original_url = $1", origURL).Scan(&url.ShortURL)
+	err := s.db.QueryRow("SELECT short_url FROM shorten_urls WHERE original_url = $1", origURL).Scan(&url.ShortURL)
 	if err != nil {
 		logger.Log.Error("Error in GetOrigURL. short_url", zap.Error(err))
 		return "", err
@@ -138,7 +157,7 @@ func (s *PostgreSQLStorage) GetShortURL(origURL string) (string, error) {
 }
 
 func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
-	ctx := context.Background()
+	// ctx := context.Background()
 	query := `
 		SELECT EXISTS (
 			SELECT 1
@@ -146,30 +165,10 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 			WHERE indexname = $1
 		)`
 	var exists bool
-	err := s.db.QueryRow(ctx, query, indexName).Scan(&exists)
+	err := s.db.QueryRow(query, indexName).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
 
 	return exists, nil
-}
-
-type Postgres struct {
-	store *sql.DB
-}
-
-func (s *PostgreSQLStorage) MigrateTable(dsn string) error {
-	db, err := goose.OpenDBWithDriver("postgres", dsn)
-	if err != nil {
-		logger.Log.Error("Error open conn", zap.Error(err))
-		return err
-	}
-
-	err = goose.Up(db, "./database/migration")
-	if err != nil {
-		logger.Log.Error("Error goose UP", zap.Error(err))
-		return err
-	}
-
-	return nil
 }
