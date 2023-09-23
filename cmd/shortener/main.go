@@ -51,37 +51,11 @@ func run() error {
 			return err
 		}
 
-		err = dbStorage.CreateTable()
+		err = dbStorage.MigrateTable(cfg.DSN)
 		if err != nil {
-			logger.Log.Error("Error creating table in PostgreSQL", zap.Error(err))
+			logger.Log.Error("Error migrate", zap.Error(err))
 			return err
 		}
-		//
-		// db, err := sql.Open("postgres", cfg.DSN)
-		// if err != nil {
-		// 	logger.Log.Error("Error connecting to the database: %v", zap.Error(err))
-		// }
-
-		// defer db.Close()
-		// driver, err := postgres.WithInstance(db, &postgres.Config{})
-		// if err != nil {
-		// 	logger.Log.Error("Error creating migration driver: %v", zap.Error(err))
-		// }
-
-		// m, err := migrate.NewWithDatabaseInstance(
-		// 	"database/migration",
-		// 	"postgres",
-		// 	driver,
-		// )
-		// if err != nil {
-		// 	logger.Log.Error("Error creating migration instance: %v", zap.Error(err))
-		// }
-
-		// // Выполните миграции вверх (up)
-		// if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		// 	logger.Log.Error("Error applying migrations: %v", zap.Error(err))
-		// }
-		//
 
 		shortener = handlers.NewURLShortener(cfg, dbPool, dbStorage, nil)
 

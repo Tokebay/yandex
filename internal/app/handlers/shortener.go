@@ -31,6 +31,12 @@ type URLShortener struct {
 	dbPool         *pgxpool.Pool
 }
 
+type URLData struct {
+	UUID        int    `json:"uuid"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 func (us *URLShortener) CloseFileStorage() error {
 	return us.fileStorage.Close() // Закрываем файл
 }

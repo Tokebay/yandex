@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"github.com/Tokebay/yandex/internal/models"
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v4/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose"
 	"go.uber.org/zap"
 )
 
@@ -112,7 +115,6 @@ func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, 
 // GetURL получает URL из PostgreSQL
 func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 	ctx := context.Background()
-	// получение URL из PostgreSQL
 	var url models.ShortenURL
 	row := s.db.QueryRow(ctx, "SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
 	err := row.Scan(&url.OriginalURL)
@@ -135,45 +137,6 @@ func (s *PostgreSQLStorage) GetShortURL(origURL string) (string, error) {
 	return url.ShortURL, nil
 }
 
-func (s *PostgreSQLStorage) CreateTable() error {
-	// Создание таблицы в PostgreSQL
-	ctx := context.Background()
-	_, err := s.db.Exec(ctx,
-		`CREATE TABLE IF NOT EXISTS public.shorten_urls
-		(
-			uuid SERIAL,
-			short_url text NOT NULL,
-			original_url text NOT NULL
-		)`)
-
-	if err != nil {
-		logger.Log.Error("Error occured create table", zap.Error(err))
-		return err
-	}
-
-	indexName := "original_url_index"
-
-	// Проверяем существование индекса
-	exists, err := s.indexExists(indexName)
-	if err != nil {
-		logger.Log.Error("Error create index", zap.Error(err))
-		return err
-	}
-	fmt.Println("indexExist", exists)
-	// Если индекс не существует, создаем его
-	if !exists {
-		createIndexSQL := fmt.Sprintf("CREATE UNIQUE INDEX %s ON shorten_urls (original_url)", indexName)
-		_, err := s.db.Exec(ctx, createIndexSQL)
-		if err != nil {
-			logger.Log.Error("Error create index", zap.Error(err))
-			return err
-		}
-
-	}
-
-	return nil
-}
-
 func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 	ctx := context.Background()
 	query := `
@@ -182,7 +145,6 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 			FROM pg_indexes
 			WHERE indexname = $1
 		)`
-
 	var exists bool
 	err := s.db.QueryRow(ctx, query, indexName).Scan(&exists)
 	if err != nil {
@@ -190,4 +152,24 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+type Postgres struct {
+	store *sql.DB
+}
+
+func (s *PostgreSQLStorage) MigrateTable(dsn string) error {
+	db, err := goose.OpenDBWithDriver("postgres", dsn)
+	if err != nil {
+		logger.Log.Error("Error open conn", zap.Error(err))
+		return err
+	}
+
+	err = goose.Up(db, "./database/migration")
+	if err != nil {
+		logger.Log.Error("Error goose UP", zap.Error(err))
+		return err
+	}
+
+	return nil
 }

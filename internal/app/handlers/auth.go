@@ -3,8 +3,14 @@ package handlers
 import "net/http"
 
 type User struct {
-	ID string
+	ID       string
+	Username string
+	URLs     []URLData
 }
+
+// Выдавать пользователю симметрично подписанную куку,
+// содержащую уникальный идентификатор пользователя,
+// если такой куки не существует или она не проходит проверку подлинности.
 
 type AuthService struct {
 	// логика создания и проверки сессий

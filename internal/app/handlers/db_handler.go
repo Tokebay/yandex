@@ -102,3 +102,26 @@ func (us *URLShortener) SaveToDB(shortenURL *models.ShortenURL) (*sql.DB, error)
 
 	return db, nil
 }
+
+// type Postgres struct {
+// 	store *sql.DB
+// }
+
+// func (us *URLShortener) MigrateTable(*Postgres, error) (*Postgres, error) {
+
+// 	dsn := us.config.DSN
+// 	db, err := goose.OpenDBWithDriver("pgx", dsn)
+// 	if err != nil {
+// 		logger.Log.Error("Error open conn", zap.Error(err))
+// 	}
+
+// 	err = goose.Up(db, "./migrations")
+// 	if err != nil {
+// 		logger.Log.Error("Error goose sUP", zap.Error(err))
+// 	}
+
+// 	return &Postgres{
+// 		store: db,
+// 	}, nil
+
+// }
