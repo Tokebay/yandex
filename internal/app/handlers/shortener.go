@@ -90,10 +90,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
 
 		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
 		if err != nil && shortURL == "" {
@@ -167,10 +163,6 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 
 		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
 
 		originalURL, err = pgStorage.GetURL(shortURL)
 		if err != nil {
