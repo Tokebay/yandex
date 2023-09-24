@@ -83,18 +83,17 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 
 	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DSN, cfg.FileStoragePath)
-	// databaseDSN := os.Getenv("DATABASE_DSN")
+
 	httpStatusCode := http.StatusCreated
 	if cfg.DSN != "" {
 		fmt.Println("Save to DB")
 
-		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		//existURL := pgStorage.ExistOrigURL(string(url))
-		//fmt.Println("existURL ", existURL)
 
 		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
 		if err != nil && shortURL == "" {
@@ -166,7 +165,8 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	if cfg.DSN != "" {
 		shortURL := cfg.BaseURL + r.URL.Path
 
-		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -215,11 +215,8 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	httpStatusCode := http.StatusCreated
 	if cfg.DSN != "" {
 		// заполняем структуру ShortenURL для записи в таблицу
-		pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
+		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
 		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
 		if err != nil && shortURL == "" {
