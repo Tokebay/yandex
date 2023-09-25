@@ -10,7 +10,7 @@ import (
 	"github.com/Tokebay/yandex/internal/models"
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose"
+	"github.com/pressly/goose/v3"
 	"go.uber.org/zap"
 )
 
@@ -69,7 +69,7 @@ func (s *PostgreSQLStorage) Close() error {
 
 func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
 	// Выполнить миграции
-	db, err := goose.OpenDBWithDriver("postgres", dsn)
+	db, err := goose.OpenDBWithDriver("pgx", dsn)
 	if err != nil {
 		logger.Log.Error("Error open conn", zap.Error(err))
 		return nil, err

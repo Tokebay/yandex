@@ -239,7 +239,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 			logger.Log.Error("Error saving URL data in file", zap.Error(err))
 			return
 		}
-
 	}
 
 	resp := models.Response{
