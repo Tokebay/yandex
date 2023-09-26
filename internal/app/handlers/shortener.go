@@ -62,6 +62,128 @@ func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage
 	return us
 }
 
+func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cfg := us.config
+	url, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+
+	if err != nil {
+		http.Error(w, "error reading request body", http.StatusInternalServerError)
+		return
+	}
+
+	// Генерируем случайный идентификатор для сокращения URL
+	id := us.GenerateID()
+	shortenedURL := cfg.BaseURL + "/" + id
+
+	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
+	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DSN, cfg.FileStoragePath)
+
+	httpStatusCode := http.StatusCreated
+	if cfg.DSN != "" {
+		fmt.Println("Save to DB")
+
+		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+
+		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		if err != nil && shortURL == "" {
+			httpStatusCode = http.StatusConflict
+			shortURL, err = pgStorage.GetShortURL(string(url))
+			if err != nil {
+				logger.Log.Error("Error get Original URL", zap.Error(err))
+				return
+			}
+		}
+
+		shortenedURL = shortURL
+
+	} else {
+
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		fmt.Println("Save to FILE")
+		// сохранение URL в мапу
+		err = us.Storage.SaveURL(id, string(url))
+		if err != nil {
+			logger.Log.Error("Error saving URL", zap.Error(err))
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
+		}
+
+	}
+
+	fmt.Printf("Original URL: %s\n", url)
+	fmt.Printf("Shortened URL: %s\n", shortenedURL)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
+	w.WriteHeader(httpStatusCode)
+	_, err = w.Write([]byte(shortenedURL))
+
+	if err != nil {
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (us *URLShortener) SaveToFile(urlData *URLData) error {
+
+	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+		logger.Log.Error("Error saving URL data in file", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	URLId := strings.TrimPrefix(r.URL.Path, "/")
+	cfg := us.config
+	var originalURL string
+	var err error
+	if cfg.DSN != "" {
+		shortURL := cfg.BaseURL + r.URL.Path
+
+		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+
+		originalURL, err = pgStorage.GetURL(shortURL)
+		if err != nil {
+			logger.Log.Error("Error get row from DB", zap.Error(err))
+		}
+
+	} else {
+		// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
+		originalURL, err = us.Storage.GetURL(URLId)
+		if err != nil {
+			http.Error(w, "URL not found", http.StatusBadRequest)
+			return
+		}
+	}
+	// Выполняем перенаправление на оригинальный URL
+	fmt.Printf("select originalURL %s", originalURL)
+	w.Header().Set("Location", originalURL)
+	w.WriteHeader(http.StatusTemporaryRedirect)
+
+}
+
 func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
@@ -82,21 +204,41 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	cfg := us.config
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	err := us.Storage.SaveURL(id, url)
-	if err != nil {
-		http.Error(w, "error saving URL", http.StatusInternalServerError)
-		return
-	}
+	httpStatusCode := http.StatusCreated
+	if cfg.DSN != "" {
+		// заполняем структуру ShortenURL для записи в таблицу
+		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
-	urlData := &URLData{
-		UUID:        us.GenerateUUID(),
-		ShortURL:    shortenedURL,
-		OriginalURL: string(url),
-	}
+		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		if err != nil && shortURL == "" {
+			httpStatusCode = http.StatusConflict
+			shortURL, err = pgStorage.GetShortURL(string(url))
+			if err != nil {
+				logger.Log.Error("Error get Original URL", zap.Error(err))
+				return
+			}
+		}
+		shortenedURL = shortURL
 
-	if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-		logger.Log.Error("Error saving URL data in file", zap.Error(err))
-		return
+	} else {
+		urlData := &URLData{
+			UUID:        us.GenerateUUID(),
+			ShortURL:    shortenedURL,
+			OriginalURL: string(url),
+		}
+		// сохранение URL в мапу
+		err := us.Storage.SaveURL(id, string(url))
+		if err != nil {
+			logger.Log.Error("Error saving URL", zap.Error(err))
+			http.Error(w, "Error saving URL", http.StatusInternalServerError)
+			return
+		}
+
+		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
+			logger.Log.Error("Error saving URL data in file", zap.Error(err))
+			return
+		}
 	}
 
 	resp := models.Response{
@@ -109,87 +251,12 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(httpStatusCode)
 
 	_, err = w.Write(jsonData)
 	if err != nil {
 		http.Error(w, "error writing response", http.StatusInternalServerError)
 	}
-}
-
-func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	cfg := us.config
-	url, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
-
-	if err != nil {
-		http.Error(w, "error reading request body", http.StatusInternalServerError)
-		return
-	}
-
-	// Генерируем случайный идентификатор для сокращения URL
-	id := us.GenerateID()
-	shortenedURL := cfg.BaseURL + "/" + id
-
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
-	// сохранение URL в мапу
-	err = us.Storage.SaveURL(id, string(url))
-	if err != nil {
-		logger.Log.Error("Error saving URL", zap.Error(err))
-		http.Error(w, "Error saving URL", http.StatusInternalServerError)
-		return
-	}
-
-	// если флаг пустой то не записываем данные в файл
-	fmt.Printf("FileStoragePath: %s \n", cfg.FileStoragePath)
-
-	if cfg.FileStoragePath != "" {
-		urlData := &URLData{
-			UUID:        us.GenerateUUID(),
-			ShortURL:    shortenedURL,
-			OriginalURL: string(url),
-		}
-
-		if err := us.fileStorage.SaveToFileURL(urlData); err != nil {
-			logger.Log.Error("Error saving URL data in file", zap.Error(err))
-			return
-		}
-	}
-
-	fmt.Printf("Original URL: %s\n", url)
-	fmt.Printf("Shortened URL: %s\n", shortenedURL)
-	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(shortenedURL)))
-	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write([]byte(shortenedURL))
-
-	if err != nil {
-		http.Error(w, "Error writing response", http.StatusInternalServerError)
-		return
-	}
-}
-
-func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	URLId := strings.TrimPrefix(r.URL.Path, "/")
-
-	// fmt.Printf("redirect url %s \n", r.Host+r.URL.String())
-	originalURL, err := us.Storage.GetURL(URLId)
-	if err != nil {
-		http.Error(w, "URL not found", http.StatusBadRequest)
-		return
-	}
-
-	// Выполняем перенаправление на оригинальный URL
-	w.Header().Set("Location", originalURL)
-	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
 func (us *URLShortener) GenerateID() string {

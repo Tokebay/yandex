@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -14,7 +15,7 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		contentType := r.Header.Get("Content-Type")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 
-		if supportsGzip && contentType == "application/json" || contentType == "text/html" {
+		if supportsGzip && (contentType == "application/json" || contentType == "text/html") {
 			cw := newCompressWriter(w)
 			// меняем оригинальный http.ResponseWriter на новый
 			ow = cw
@@ -57,13 +58,12 @@ func (c *compressWriter) Header() http.Header {
 }
 
 func (c *compressWriter) Write(p []byte) (int, error) {
+	fmt.Printf("compressWriter Write %s \n", p)
 	return c.zw.Write(p)
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
-	if statusCode < 300 {
-		c.w.Header().Set("Content-Encoding", "gzip")
-	}
+	c.w.Header().Set("Content-Encoding", "gzip")
 	c.w.WriteHeader(statusCode)
 }
 

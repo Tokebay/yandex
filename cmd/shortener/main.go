@@ -8,6 +8,7 @@ import (
 
 	"github.com/Tokebay/yandex/internal/app/handlers"
 	"github.com/Tokebay/yandex/internal/app/storage"
+
 	logger "github.com/Tokebay/yandex/internal/logger"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -23,14 +24,34 @@ func run() error {
 	//Инициализируется логгер
 	logger.Initialize("info")
 
+	// конфиг для запуска
 	cfg := config.NewConfig()
-	storage := storage.NewMapStorage()
+
+	mapStorage := storage.NewMapStorage()
 	var fileStorage *handlers.Producer
 	var shortener *handlers.URLShortener
 	var err error
+	fmt.Printf("FileStoragePath: %s; DSN: %s \n", cfg.FileStoragePath, cfg.DSN)
 
-	fmt.Printf("FileStoragePath: %s\n", cfg.FileStoragePath)
-	if cfg.FileStoragePath != "" {
+	if cfg.DSN != "" {
+		fmt.Println("connect to DB")
+		// // создаю пул соединений
+		// dbPool, err := pgxpool.Connect(context.Background(), cfg.DSN)
+		// if err != nil {
+		// 	logger.Log.Error("Error connecting to the database: %v", zap.Error(err))
+		// }
+		// defer dbPool.Close()
+
+		// Инициализировать и использовать PostgreSQL хранилище
+		dbStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		if err != nil {
+			logger.Log.Error("Error in NewPostgreSQLStorage", zap.Error(err))
+			return err
+		}
+
+		shortener = handlers.NewURLShortener(cfg, dbStorage, nil)
+
+	} else {
 		fileStorage, err = handlers.NewProducer(cfg.FileStoragePath)
 		if err != nil {
 			logger.Log.Error("Error in NewProducer", zap.Error(err))
@@ -46,28 +67,16 @@ func run() error {
 
 		for _, urlData := range urlDataSlice {
 			// fmt.Printf("urlData.ShortURL %s;  urlData.OriginalUR %s \n", urlData.ShortURL, urlData.OriginalURL)
-			err := storage.SaveURL(urlData.ShortURL, urlData.OriginalURL)
+			err := mapStorage.SaveURL(urlData.ShortURL, urlData.OriginalURL)
 			if err != nil {
 				logger.Log.Error("Error saving URL to storage", zap.Error(err))
 				return err
 			}
 		}
-		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
-	} else {
-		shortener = handlers.NewURLShortener(cfg, storage, fileStorage)
+		shortener = handlers.NewURLShortener(cfg, mapStorage, fileStorage)
 	}
-	// маршрутизатор (chi.Router), который будет использоваться для обработки HTTP-запросов.
-	r := chi.NewRouter()
-	// промежуточное ПО (middleware) для логирования. перед каждым запросом будет выполнена функция logger.LoggerMiddleware
-	r.Use(logger.LoggerMiddleware)
-	r.Use(logger.RecoveryMiddleware)
-	// middleware проверяет поддержку сжатия gzip
-	r.Use(handlers.GzipMiddleware)
 
-	r.Post("/", shortener.ShortenURLHandler)
-	r.Get("/{id}", shortener.RedirectURLHandler)
-	r.Post("/api/shorten", shortener.APIShortenerURL)
-
+	r := createRouter(shortener, cfg)
 	addr := cfg.ServerAddress
 	logger.Log.Info("Server is starting", zap.String("address", addr))
 
@@ -79,4 +88,22 @@ func run() error {
 	}
 
 	return nil
+}
+
+func createRouter(shortener *handlers.URLShortener, cfg *config.Config) chi.Router {
+	r := chi.NewRouter()
+
+	// Промежуточное ПО (middleware) для логирования. перед каждым запросом будет выполнена функция logger.LoggerMiddleware
+	r.Use(logger.LoggerMiddleware)
+	r.Use(logger.RecoveryMiddleware)
+	// middleware проверяет поддержку сжатия gzip
+	r.Use(handlers.GzipMiddleware)
+
+	r.Post("/", shortener.ShortenURLHandler)
+	r.Get("/{id}", shortener.RedirectURLHandler)
+	r.Post("/api/shorten", shortener.APIShortenerURL)
+	r.Get("/ping", shortener.CheckDBConnect)
+	r.Post("/api/shorten/batch", shortener.BatchShortenURLHandler)
+
+	return r
 }

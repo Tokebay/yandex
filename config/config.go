@@ -10,6 +10,16 @@ type Config struct {
 	BaseURL         string
 	ServerPort      string
 	FileStoragePath string
+	DSN             string
+	DataBaseConn    DataBase
+}
+
+type DataBase struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	DBName   string
 }
 
 func NewConfig() *Config {
@@ -19,6 +29,8 @@ func NewConfig() *Config {
 	flag.StringVar(&config.BaseURL, "b", "http://localhost:8080", "Base URL for shortened URLs")
 	flag.StringVar(&config.ServerPort, "p", "8080", "HTTP server port")
 	flag.StringVar(&config.FileStoragePath, "f", "/tmp/short-url-db.json", "Path to FILE_STORAGE_PATH")
+
+	flag.StringVar(&config.DSN, "d", "", "Database DSN") // Добавляем флаг для строки подключения к БД
 
 	flag.Parse()
 
@@ -43,5 +55,9 @@ func (c *Config) parseEnv() {
 
 	if envFilePath := os.Getenv("FILE_STORAGE_PATH"); envFilePath != "" {
 		c.FileStoragePath = envFilePath
+	}
+
+	if envDBDSN := os.Getenv("DATABASE_DSN"); envDBDSN != "" {
+		c.DSN = envDBDSN
 	}
 }
