@@ -206,14 +206,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	defer r.Body.Close()
 	url := req.URL
 
-	userID, err := us.GetNextUserID(w, r)
-	fmt.Printf("shortener. user %d; err %s \n", userID, err)
-	if err != nil {
-		// w.WriteHeader(http.StatusBadRequest)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	id := us.GenerateID()
 	cfg := us.config
 
@@ -221,6 +213,14 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 
 	httpStatusCode := http.StatusCreated
 	if cfg.DSN != "" {
+		userID, err := us.GetNextUserID(w, r)
+		fmt.Printf("shortener. user %d; err %s \n", userID, err)
+		if err != nil {
+			// w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
 		var mURL models.ShortenURL
