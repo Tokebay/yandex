@@ -67,8 +67,8 @@ func (s *PostgreSQLStorage) Close() error {
 	return nil
 }
 
-func (pg *PostgreSQLStorage) Prepare(query string) (*sql.Stmt, error) {
-	stmt, err := pg.db.Prepare(query)
+func (s *PostgreSQLStorage) Prepare(query string) (*sql.Stmt, error) {
+	stmt, err := s.db.Prepare(query)
 	if err != nil {
 		return nil, err
 	}

@@ -70,7 +70,7 @@ func (us *URLShortener) GetNextUserID(w http.ResponseWriter, r *http.Request) (i
 
 	userID, err := GetUserCookie(r)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "internal Server Error", http.StatusInternalServerError)
 		logger.Log.Error("Error getting user cookie", zap.Error(err))
 		return 0, err
 	}
@@ -87,9 +87,9 @@ func (us *URLShortener) GetNextUserID(w http.ResponseWriter, r *http.Request) (i
 	}
 
 	if err = SetCookieUserID(w, userID); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		logger.Log.Error("Error setting user ID cookie", zap.Error(err))
-		return 0, fmt.Errorf("Error setting user ID cookie: %w", err)
+		return 0, fmt.Errorf("error setting user ID cookie: %w", err)
 	}
 
 	return userID, nil
