@@ -296,14 +296,16 @@ func (us *URLShortener) GetAllURLByUserID(w http.ResponseWriter, r *http.Request
 		// Получите все URL пользователя из базы данных
 		urls, err := us.GetUserURLs(userID)
 		if err != nil {
-			w.WriteHeader(http.StatusNoContent)
 			logger.Log.Error("Error getting user URLs from database", zap.Error(err))
 			return
 		}
-		// Преобразуйте URLs в формат JSON и отправьте клиенту
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(urls)
+
+		if urls == nil {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(urls)
+		}
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
