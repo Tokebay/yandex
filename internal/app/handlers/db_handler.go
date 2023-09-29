@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Tokebay/yandex/internal/app/storage"
 	"github.com/Tokebay/yandex/internal/logger"
-	"github.com/Tokebay/yandex/internal/models"
+	"github.com/golang-jwt/jwt/v4"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 )
@@ -34,19 +35,6 @@ func (us *URLShortener) CheckDBConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-
-}
-
-func (us *URLShortener) GetDB() (*sql.DB, error) {
-
-	dbConnString := us.config.DSN
-	fmt.Printf("dsn %s \n", dbConnString)
-	db, err := sql.Open("postgres", dbConnString)
-	if err != nil {
-		logger.Log.Error("Error open connection with DB", zap.Error(err))
-
-	}
-	return db, nil
 }
 
 func CreateShortenedURLTable(db *sql.DB) error {
@@ -64,64 +52,119 @@ func CreateShortenedURLTable(db *sql.DB) error {
 	return nil
 }
 
-func (us *URLShortener) InsertData(db *sql.DB, url *models.ShortenURL) error {
+func (us *URLShortener) GetDB() (*sql.DB, error) {
 
-	_, err := db.Exec(`
-        INSERT INTO shorten_urls (short_url, original_url)
-        VALUES ($1, $2)`,
-		url.ShortURL, url.OriginalURL)
-
-	return err
-}
-
-func (us *URLShortener) SelectURLData(db *sql.DB, shortURL string) (string, error) {
-
-	fmt.Printf("shortURL %s \n", shortURL)
-	var url models.ShortenURL
-	row := db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
-	err := row.Scan(&url.OriginalURL)
+	dbConnString := us.config.DSN
+	fmt.Printf("dsn %s \n", dbConnString)
+	db, err := sql.Open("postgres", dbConnString)
 	if err != nil {
-		logger.Log.Error("Error select row from DB", zap.Error(err))
-		return "", err
-	}
-	// fmt.Printf("selectURL url.OriginalURL %s \n", url.OriginalURL)
-	return url.OriginalURL, nil
-}
+		logger.Log.Error("Error open connection with DB", zap.Error(err))
 
-func (us *URLShortener) SaveToDB(shortenURL *models.ShortenURL) (*sql.DB, error) {
-	//ping DB
-	db, err := us.GetDB()
-	if err != nil {
-		logger.Log.Error("Error connect to DB", zap.Error(err))
 	}
-	err = us.InsertData(db, shortenURL)
-	if err != nil {
-		logger.Log.Info("Error insert data to table", zap.Error(err))
-		return nil, err
-	}
-
 	return db, nil
 }
 
-// type Postgres struct {
-// 	store *sql.DB
-// }
+// Функция для обновления идентификатора пользователя в базе данных.
+func (us *URLShortener) GetNextUserID(w http.ResponseWriter, r *http.Request) (int, error) {
+	var userID int
 
-// func (us *URLShortener) MigrateTable(*Postgres, error) (*Postgres, error) {
+	userID, err := GetUserCookie(r)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		logger.Log.Error("Error getting user cookie", zap.Error(err))
+		return 0, err
+	}
 
-// 	dsn := us.config.DSN
-// 	db, err := goose.OpenDBWithDriver("pgx", dsn)
-// 	if err != nil {
-// 		logger.Log.Error("Error open conn", zap.Error(err))
-// 	}
+	if userID == 0 {
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+		userID, err = pgStorage.InsertUser()
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			logger.Log.Error("Error Insert Users", zap.Error(err))
+			return 0, err
+		}
+		fmt.Printf("GetNextUserID userID %d \n", userID)
+	}
 
-// 	err = goose.Up(db, "./migrations")
-// 	if err != nil {
-// 		logger.Log.Error("Error goose sUP", zap.Error(err))
-// 	}
+	if err = SetCookieUserID(w, userID); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		logger.Log.Error("Error setting user ID cookie", zap.Error(err))
+		return 0, fmt.Errorf("Error setting user ID cookie: %w", err)
+	}
 
-// 	return &Postgres{
-// 		store: db,
-// 	}, nil
+	return userID, nil
+}
 
-// }
+func GetUserID(tokenString string) (int, error) {
+	claims := &Claims{}
+	fmt.Printf("GetUserID. tokenString %s \n", tokenString)
+	token, err := jwt.ParseWithClaims(tokenString, claims,
+		func(t *jwt.Token) (interface{}, error) {
+			return []byte(SecretKey), nil
+		})
+	if err != nil {
+		return -1, err
+	}
+
+	if !token.Valid {
+		fmt.Println("Token is not valid")
+		return -1, ErrToken
+	}
+
+	return claims.UserID, err
+}
+
+func SetCookieUserID(w http.ResponseWriter, userID int) error {
+	token, err := BuildJWTString(userID)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		logger.Log.Error("SetCookieUserID. error BuildJWTString", zap.Error(err))
+		return err
+	}
+
+	cookie := &http.Cookie{
+		Name:  CookieName,
+		Value: token,
+	}
+
+	http.SetCookie(w, cookie)
+	return nil
+}
+
+func (us *URLShortener) GetUserURLs(userID int) ([]URLData, error) {
+
+	var urls []URLData
+	//Prepared Statements
+	pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+	stmt, err := pgStorage.Prepare("SELECT uuid, short_url, original_url FROM shorten_urls WHERE user_id = $1")
+	if err != nil {
+		logger.Log.Error("Error prepare statement", zap.Error(err))
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(userID)
+	if err != nil {
+		logger.Log.Error("Error stmt query", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var url URLData
+		err := rows.Scan(&url.UUID, &url.ShortURL, &url.OriginalURL)
+		if err != nil {
+			logger.Log.Error("Error scanning rows", zap.Error(err))
+			return nil, err
+		}
+		urls = append(urls, url)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		logger.Log.Error("Error rows", zap.Error(err))
+		return nil, err
+	}
+
+	return urls, nil
+}

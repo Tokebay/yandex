@@ -17,8 +17,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
 type URLShortener struct {
 	generateIDFunc func() string
 	config         *config.Config
@@ -77,21 +75,33 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	userID, err := us.GetNextUserID(w, r)
+	fmt.Printf("shortener. user %d; err %s \n", userID, err)
+	if err != nil {
+		// w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	// Генерируем случайный идентификатор для сокращения URL
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DSN, cfg.FileStoragePath)
-
 	httpStatusCode := http.StatusCreated
+
 	if cfg.DSN != "" {
-		fmt.Println("Save to DB")
-
-		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+		fmt.Println("Save to DB")
+		var mURL models.ShortenURL
 
-		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		mURL.ShortURL = cfg.BaseURL + "/" + id
+		mURL.OriginalURL = string(url)
+		mURL.UserID = userID
+
+		fmt.Printf("Received URL to save: id=%s, origURL %s, userID %d \n", mURL.ShortURL, mURL.OriginalURL, mURL.UserID)
+
+		shortURL, err := pgStorage.InsertURL(mURL)
 		if err != nil && shortURL == "" {
 			httpStatusCode = http.StatusConflict
 			shortURL, err = pgStorage.GetShortURL(string(url))
@@ -100,11 +110,8 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 				return
 			}
 		}
-
 		shortenedURL = shortURL
-
 	} else {
-
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),
 			ShortURL:    shortenedURL,
@@ -123,7 +130,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 			logger.Log.Error("Error saving URL data in file", zap.Error(err))
 			return
 		}
-
 	}
 
 	fmt.Printf("Original URL: %s\n", url)
@@ -200,17 +206,29 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	defer r.Body.Close()
 	url := req.URL
 
+	userID, err := us.GetNextUserID(w, r)
+	fmt.Printf("shortener. user %d; err %s \n", userID, err)
+	if err != nil {
+		// w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	id := us.GenerateID()
 	cfg := us.config
+
 	shortenedURL := cfg.BaseURL + "/" + id
 
 	httpStatusCode := http.StatusCreated
 	if cfg.DSN != "" {
-		// заполняем структуру ShortenURL для записи в таблицу
-		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
-		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		var mURL models.ShortenURL
+		mURL.OriginalURL = string(url)
+		mURL.ShortURL = shortenedURL
+		mURL.UserID = userID
+
+		shortURL, err := pgStorage.InsertURL(mURL)
 		if err != nil && shortURL == "" {
 			httpStatusCode = http.StatusConflict
 			shortURL, err = pgStorage.GetShortURL(string(url))
@@ -259,6 +277,33 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (us *URLShortener) GetAllURLByUserID(w http.ResponseWriter, r *http.Request) {
+	cfg := us.config
+	if cfg.DSN != "" {
+		userID, err := us.GetNextUserID(w, r)
+		fmt.Printf("GetAllURLByUserID. user %d; err %s \n", userID, err)
+		if err != nil {
+			logger.Log.Error("GetAllURLByUserID. Error GetNextUserID", zap.Error(err))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Получите все URL пользователя из базы данных
+		urls, err := us.GetUserURLs(userID)
+		if err != nil {
+			w.WriteHeader(http.StatusNoContent)
+			logger.Log.Error("Error getting user URLs from database", zap.Error(err))
+			return
+		}
+		// Преобразуйте URLs в формат JSON и отправьте клиенту
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(urls)
+	} else {
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+}
+
 func (us *URLShortener) GenerateID() string {
 	// для тестов
 	if us.generateIDFunc != nil {
@@ -277,5 +322,4 @@ func (us *URLShortener) GenerateID() string {
 	}
 
 	return id
-
 }

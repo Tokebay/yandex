@@ -8,7 +8,6 @@ import (
 
 	"github.com/Tokebay/yandex/internal/app/handlers"
 	"github.com/Tokebay/yandex/internal/app/storage"
-
 	logger "github.com/Tokebay/yandex/internal/logger"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -104,6 +103,7 @@ func createRouter(shortener *handlers.URLShortener, cfg *config.Config) chi.Rout
 	r.Post("/api/shorten", shortener.APIShortenerURL)
 	r.Get("/ping", shortener.CheckDBConnect)
 	r.Post("/api/shorten/batch", shortener.BatchShortenURLHandler)
+	r.Post("/api/user/urls", shortener.GetAllURLByUserID)
 
 	return r
 }

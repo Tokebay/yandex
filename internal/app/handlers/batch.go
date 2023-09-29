@@ -30,13 +30,17 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 
 	for _, url := range req {
 		id := us.GenerateID()
-		shortenedURL := cfg.BaseURL + "/" + id
+		var mURL models.ShortenURL
+		mURL.ShortURL = cfg.BaseURL + "/" + id
+		mURL.OriginalURL = url.OriginalURL
+		shortenedURL := mURL.ShortURL
+		// shortenedURL := cfg.BaseURL + "/" + id
 
 		// fmt.Printf("id %s ; origURL %s;  \n", url.CorrelationID, url.OriginalURL)
 		if cfg.DSN != "" {
 			// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 			pgStorage := us.Storage.(*storage.PostgreSQLStorage)
-			shortURL, err := pgStorage.InsertURL(shortenedURL, url.OriginalURL)
+			shortURL, err := pgStorage.InsertURL(mURL)
 			if err != nil && shortURL == "" {
 				httpStatusCode = http.StatusConflict
 				shortURL, err = pgStorage.GetShortURL(url.OriginalURL)

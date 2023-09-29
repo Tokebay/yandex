@@ -67,6 +67,14 @@ func (s *PostgreSQLStorage) Close() error {
 	return nil
 }
 
+func (pg *PostgreSQLStorage) Prepare(query string) (*sql.Stmt, error) {
+	stmt, err := pg.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	return stmt, nil
+}
+
 func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
 	// Выполнить миграции
 	db, err := goose.OpenDBWithDriver("pgx", dsn)
@@ -97,8 +105,7 @@ func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 		 INSERT INTO shorten_urls (short_url, original_url)
 		 VALUES ($1, $2)
 		 ON CONFLICT (original_url) DO NOTHING
-		 RETURNING short_url
-	 `, shortURL, origURL).Scan(&returnedShortURL)
+		 RETURNING short_url`, shortURL, origURL).Scan(&returnedShortURL)
 
 	if err != nil {
 		if err == pgx.ErrNoRows { // если ON CONFLICT не сработал и ни одна строка не вернулась
@@ -112,16 +119,29 @@ func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	return nil
 }
 
-func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, error) {
+func (s *PostgreSQLStorage) InsertUser() (int, error) {
+
+	var userID int
+
+	err := s.db.QueryRow(`INSERT INTO users DEFAULT VALUES RETURNING user_id`).Scan(&userID)
+
+	if err != nil {
+		logger.Log.Error("Error Insert Users", zap.Error(err))
+		return 0, err
+	}
+
+	return userID, nil
+}
+
+func (s *PostgreSQLStorage) InsertURL(url models.ShortenURL) (string, error) {
 	// ctx := context.Background()
 
 	var existingShortURL string
 
-	err := s.db.QueryRow(`
-	    INSERT INTO shorten_urls (short_url, original_url)
-	    VALUES ($1, $2)
+	err := s.db.QueryRow(`INSERT INTO shorten_urls (short_url, original_url,user_id)
+	    VALUES ($1, $2, $3)
 	    ON CONFLICT (original_url) DO NOTHING
-	    RETURNING short_url`, shortURL, origURL).Scan(&existingShortURL)
+	    RETURNING short_url`, url.ShortURL, url.OriginalURL, url.UserID).Scan(&existingShortURL)
 
 	if err != nil {
 		logger.Log.Error("Error Insert URL to table", zap.Error(err))
