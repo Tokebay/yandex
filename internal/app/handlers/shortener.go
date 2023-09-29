@@ -75,14 +75,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userID, err := us.GetNextUserID(w, r)
-	fmt.Printf("shortener. user %d; err %s \n", userID, err)
-	if err != nil {
-		// w.WriteHeader(http.StatusBadRequest)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	// Генерируем случайный идентификатор для сокращения URL
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
@@ -91,6 +83,14 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	httpStatusCode := http.StatusCreated
 
 	if cfg.DSN != "" {
+		userID, err := us.GetNextUserID(w, r)
+		fmt.Printf("shortener. user %d; err %s \n", userID, err)
+		if err != nil {
+			// w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 		fmt.Println("Save to DB")
 		var mURL models.ShortenURL

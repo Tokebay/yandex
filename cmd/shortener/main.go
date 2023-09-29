@@ -34,13 +34,6 @@ func run() error {
 
 	if cfg.DSN != "" {
 		fmt.Println("connect to DB")
-		// // создаю пул соединений
-		// dbPool, err := pgxpool.Connect(context.Background(), cfg.DSN)
-		// if err != nil {
-		// 	logger.Log.Error("Error connecting to the database: %v", zap.Error(err))
-		// }
-		// defer dbPool.Close()
-
 		// Инициализировать и использовать PostgreSQL хранилище
 		dbStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
