@@ -278,6 +278,11 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 }
 
 func (us *URLShortener) GetAllURLByUserID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	cfg := us.config
 	if cfg.DSN != "" {
 		userID, err := us.GetNextUserID(w, r)
@@ -297,8 +302,10 @@ func (us *URLShortener) GetAllURLByUserID(w http.ResponseWriter, r *http.Request
 		}
 		// Преобразуйте URLs в формат JSON и отправьте клиенту
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(urls)
 	} else {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 
