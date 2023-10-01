@@ -86,7 +86,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 		userID, err := us.GetNextUserID(w, r)
 		fmt.Printf("shortener. user %d; err %s \n", userID, err)
 		if err != nil {
-			// w.WriteHeader(http.StatusBadRequest)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -167,7 +166,6 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	if cfg.DSN != "" {
 		shortURL := cfg.BaseURL + r.URL.Path
 
-		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
 		originalURL, err = pgStorage.GetURL(shortURL)
@@ -324,6 +322,7 @@ func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Reque
 	}
 	cfg := us.config
 	hostURL := r.Host
+
 	// Получаю список идентификаторов сокращенных URL из body
 	var urlsToDelete []string
 	decoder := json.NewDecoder(r.Body)
@@ -339,7 +338,6 @@ func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	// fmt.Printf("URLs to delete %s \n", urlsToDelete)
 
 	if cfg.BaseURL != "" {
 		hostURL = cfg.BaseURL
