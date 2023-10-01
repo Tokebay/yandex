@@ -184,9 +184,13 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	// Выполняем перенаправление на оригинальный URL
-	fmt.Printf("select originalURL %s", originalURL)
-	w.Header().Set("Location", originalURL)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	fmt.Printf("RedirectURLHandler. original URL=%s \n", originalURL)
+	if originalURL == "" {
+		w.WriteHeader(http.StatusGone)
+	} else {
+		w.Header().Set("Location", originalURL)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	}
 
 }
 
@@ -311,6 +315,55 @@ func (us *URLShortener) GetAllURLByUserID(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 
+}
+
+func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	cfg := us.config
+	hostURL := r.Host
+	// Получаю список идентификаторов сокращенных URL из body
+	var urlsToDelete []string
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&urlsToDelete); err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Получаю userID
+	userID, err := us.GetNextUserID(w, r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	// fmt.Printf("URLs to delete %s \n", urlsToDelete)
+
+	if cfg.BaseURL != "" {
+		hostURL = cfg.BaseURL
+	}
+
+	var deleteURLs []string
+	// добавляю HostURL http://localhost:8080 т.к. в базе храню ссылку типа http://localhost:8080/894795aeef
+	for _, shortURL := range urlsToDelete {
+		fullURL := hostURL + "/" + shortURL
+		deleteURLs = append(deleteURLs, fullURL)
+	}
+	fmt.Printf("after add URLs to delete %s \n", deleteURLs)
+
+	// Выполняю update для проставления флага "удаленности" в БД
+	pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+	err = pgStorage.MarkURLsAsDeleted(userID, deleteURLs)
+	if err != nil {
+		http.Error(w, "Error marking URLs as deleted", http.StatusInternalServerError)
+		logger.Log.Error("Error marking URLs as deleted", zap.Error(err))
+		return
+	}
+
+	// Возвращаем статус 202 Accepted
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (us *URLShortener) GenerateID() string {

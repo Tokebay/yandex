@@ -97,6 +97,7 @@ func createRouter(shortener *handlers.URLShortener, cfg *config.Config) chi.Rout
 	r.Get("/ping", shortener.CheckDBConnect)
 	r.Post("/api/shorten/batch", shortener.BatchShortenURLHandler)
 	r.Get("/api/user/urls", shortener.GetAllURLByUserID)
+	r.Delete("/api/user/urls", shortener.DeleteShortenedURLs)
 
 	return r
 }

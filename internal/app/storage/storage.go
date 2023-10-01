@@ -10,6 +10,7 @@ import (
 	"github.com/Tokebay/yandex/internal/models"
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"go.uber.org/zap"
 )
@@ -123,7 +124,7 @@ func (s *PostgreSQLStorage) InsertUser() (int, error) {
 
 	var userID int
 
-	err := s.db.QueryRow(`INSERT INTO users DEFAULT VALUES RETURNING user_id`).Scan(&userID)
+	err := s.db.QueryRow(`INSERT INTO users_links DEFAULT VALUES RETURNING user_id`).Scan(&userID)
 
 	if err != nil {
 		logger.Log.Error("Error Insert Users", zap.Error(err))
@@ -155,7 +156,7 @@ func (s *PostgreSQLStorage) InsertURL(url models.ShortenURL) (string, error) {
 func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 	// ctx := context.Background()
 	var url models.ShortenURL
-	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
+	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1 and is_deleted != true", shortURL)
 	err := row.Scan(&url.OriginalURL)
 	if err != nil {
 		logger.Log.Error("No row selected from table", zap.Error(err))
@@ -191,4 +192,19 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+// Помечаем URL как удаленные для UserID
+func (s *PostgreSQLStorage) MarkURLsAsDeleted(userID int, urlsToDelete []string) error {
+
+	query := "UPDATE shorten_urls SET is_deleted = true WHERE user_id = $1 AND short_url = ANY($2)"
+	// fmt.Printf("%s %d %s \n", query, userID, urlsToDelete)
+
+	_, err := s.db.Exec(query, userID, pq.Array(urlsToDelete))
+	if err != nil {
+		logger.Log.Error("error update shorten_urls", zap.Error(err))
+		return err
+	}
+
+	return nil
 }

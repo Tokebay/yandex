@@ -83,13 +83,13 @@ func (us *URLShortener) GetNextUserID(w http.ResponseWriter, r *http.Request) (i
 			logger.Log.Error("Error Insert Users", zap.Error(err))
 			return 0, err
 		}
-		fmt.Printf("GetNextUserID userID %d \n", userID)
+		// fmt.Printf("GetNextUserID userID %d \n", userID)
 	}
 
 	if err = SetCookieUserID(w, userID); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		logger.Log.Error("Error setting user ID cookie", zap.Error(err))
-		return 0, fmt.Errorf("error setting user ID cookie: %w", err)
+		return 0, err
 	}
 
 	return userID, nil
@@ -123,8 +123,9 @@ func SetCookieUserID(w http.ResponseWriter, userID int) error {
 	}
 
 	cookie := &http.Cookie{
-		Name:  CookieName,
-		Value: token,
+		Name:     CookieName,
+		Value:    token,
+		HttpOnly: true,
 	}
 
 	http.SetCookie(w, cookie)
