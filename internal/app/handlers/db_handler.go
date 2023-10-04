@@ -92,6 +92,7 @@ func (us *URLShortener) GetNextUserID(w http.ResponseWriter, r *http.Request) (i
 		return 0, err
 	}
 
+	// ctx := context.WithValue(r.Context(), "userID", userID)
 	return userID, nil
 }
 
