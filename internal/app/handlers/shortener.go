@@ -76,21 +76,16 @@ func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage
 }
 
 func (us *URLShortener) ProcessDeletedURLs() error {
-	for {
-		select {
-		case deleteRequest, ok := <-us.deleteCh:
-			if !ok {
-				return nil
-			}
-			// Получил данные из канала для проставления флага удаления
-			pgStorage := us.Storage.(*storage.PostgreSQLStorage)
-			err := pgStorage.MarkURLAsDeleted(deleteRequest.UserID, deleteRequest.URL)
-			if err != nil {
-				logger.Log.Error("Error marking URL as deleted", zap.Error(err))
-				return err
-			}
+	for deleteRequest := range us.deleteCh {
+		// Получил данные из канала для проставления флага удаления
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+		err := pgStorage.MarkURLAsDeleted(deleteRequest.UserID, deleteRequest.URL)
+		if err != nil {
+			logger.Log.Error("Error marking URL as deleted", zap.Error(err))
+			return err
 		}
 	}
+	return nil
 }
 
 func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
