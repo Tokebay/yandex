@@ -10,6 +10,7 @@ import (
 	"github.com/Tokebay/yandex/internal/models"
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"go.uber.org/zap"
 )
@@ -193,14 +194,23 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 	return exists, nil
 }
 
-func (s *PostgreSQLStorage) MarkURLAsDeleted(userID int, url string) error {
+func (s *PostgreSQLStorage) MarkURLAsDeleted(userID int, url []string) error {
 	// Обновление записи в базе данных для удаления URL, учитывая userID
-	fmt.Printf("MarkURLAsDeleted userID %d, url %s \n", userID, url)
-	query := "UPDATE shorten_urls SET is_deleted = true WHERE user_id = $1 AND short_url = $2"
-	_, err := s.db.Exec(query, userID, url)
+	// fmt.Printf("MarkURLAsDeleted userID %d, url %s \n", userID, url)
+	// query := "UPDATE shorten_urls SET is_deleted = true WHERE user_id = $1 AND short_url = $2"
+	// _, err := s.db.Exec(query, userID, url)
+	// if err != nil {
+	// 	logger.Log.Error("error update shorten_urls", zap.Error(err))
+	// 	return err
+	// }
+	query := "UPDATE shorten_urls SET is_deleted = true WHERE user_id = $1 AND short_url = ANY($2)"
+	fmt.Printf("%s %d %s \n", query, userID, url)
+
+	_, err := s.db.Exec(query, userID, pq.Array(url))
 	if err != nil {
 		logger.Log.Error("error update shorten_urls", zap.Error(err))
 		return err
 	}
+
 	return nil
 }

@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,8 +30,9 @@ type URLShortener struct {
 	URLDataSlice   []URLData
 	deleteCh       chan struct {
 		UserID int
-		URL    string
+		URL    []string
 	}
+	ctx context.Context
 }
 
 type URLData struct {
@@ -57,10 +61,10 @@ func (us *URLShortener) GenerateUUID() int {
 const buffSize = 100
 
 func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage *Producer) *URLShortener {
-
+	ctx, _ := context.WithCancel(context.Background())
 	deleteCh := make(chan struct {
 		UserID int
-		URL    string
+		URL    []string
 	}, buffSize)
 
 	us := &URLShortener{
@@ -69,22 +73,45 @@ func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage
 		fileStorage: fileStorage,
 		uuidCounter: 0,
 		deleteCh:    deleteCh,
+		ctx:         ctx,
 	}
 	go us.ProcessDeletedURLs()
 
 	return us
 }
 
+// func (us *URLShortener) ProcessDeletedURLs() error {
+// 	for deleteRequest := range us.deleteCh {
+// 		// Получил данные из канала для проставления флага удаления
+// 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+// 		fmt.Printf("ProcessDeletedURLs %s; USERID %d\n", deleteRequest.URL, deleteRequest.UserID)
+// 		err := pgStorage.MarkURLAsDeleted(deleteRequest.UserID, deleteRequest.URL)
+// 		if err != nil {
+// 			logger.Log.Error("Error marking URL as deleted", zap.Error(err))
+// 			return err
+// 		}
+// 	}
+// 	return nil
+// }
+
 func (us *URLShortener) ProcessDeletedURLs() error {
 	for deleteRequest := range us.deleteCh {
 		// Получил данные из канала для проставления флага удаления
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+		fmt.Printf("ProcessDeletedURLs %s; USERID %d\n", deleteRequest.URL, deleteRequest.UserID)
 		err := pgStorage.MarkURLAsDeleted(deleteRequest.UserID, deleteRequest.URL)
 		if err != nil {
-			logger.Log.Error("Error marking URL as deleted", zap.Error(err))
+			logger.Log.Error("Error marking URLs as deleted", zap.Error(err))
+			// Если URL не существует в базе данных, вернуть 404 Not Found
+			if errors.Is(err, sql.ErrNoRows) {
+				logger.Log.Error("URL not found:", zap.Error(err))
+				return err
+			}
 			return err
 		}
 	}
+
+	// Канал закрыт
 	return nil
 }
 
@@ -97,7 +124,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	cfg := us.config
 	url, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
-
 	if err != nil {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
@@ -372,17 +398,20 @@ func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Reque
 	}
 	fmt.Printf("DeleteShortenedURLs. URLs to delete %s \n", urlsToDelete)
 
+	var deleteURLs []string
 	for _, shortURL := range urlsToDelete {
 		fullURL := hostURL + "/" + shortURL
 		// Передаю userID и URL в канал на удаление
-		us.deleteCh <- struct {
-			UserID int
-			URL    string
-		}{
-			UserID: userID,
-			URL:    fullURL,
-		}
+		deleteURLs = append(deleteURLs, fullURL)
 	}
+	us.deleteCh <- struct {
+		UserID int
+		URL    []string
+	}{
+		UserID: userID,
+		URL:    deleteURLs,
+	}
+
 	// закрываю канал после передачи всех URL
 	close(us.deleteCh)
 
