@@ -384,6 +384,8 @@ func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Reque
 			URL:    fullURL,
 		}
 	}
+	// закрываю канал после передачи всех URL
+	close(us.deleteCh)
 
 	w.WriteHeader(http.StatusAccepted)
 }
