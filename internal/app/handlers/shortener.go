@@ -235,7 +235,6 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	}
 	defer r.Body.Close()
 	url := req.URL
-
 	id := us.GenerateID()
 	cfg := us.config
 
