@@ -70,12 +70,12 @@ func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage
 		uuidCounter: 0,
 		deleteCh:    deleteCh,
 	}
-	go us.ProcessDeletedURLs()
 
 	return us
 }
 
 func (us *URLShortener) ProcessDeletedURLs() error {
+	fmt.Println("ProcessDeletedURLs")
 	for deleteRequest := range us.deleteCh {
 		// Получил данные из канала для проставления флага удаления
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
@@ -348,6 +348,8 @@ func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	go us.ProcessDeletedURLs()
+
 	cfg := us.config
 	hostURL := r.Host
 
