@@ -8,7 +8,6 @@ import (
 
 	"github.com/Tokebay/yandex/internal/app/handlers"
 	"github.com/Tokebay/yandex/internal/app/storage"
-
 	logger "github.com/Tokebay/yandex/internal/logger"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -35,13 +34,6 @@ func run() error {
 
 	if cfg.DSN != "" {
 		fmt.Println("connect to DB")
-		// // создаю пул соединений
-		// dbPool, err := pgxpool.Connect(context.Background(), cfg.DSN)
-		// if err != nil {
-		// 	logger.Log.Error("Error connecting to the database: %v", zap.Error(err))
-		// }
-		// defer dbPool.Close()
-
 		// Инициализировать и использовать PostgreSQL хранилище
 		dbStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		if err != nil {
@@ -104,6 +96,8 @@ func createRouter(shortener *handlers.URLShortener, cfg *config.Config) chi.Rout
 	r.Post("/api/shorten", shortener.APIShortenerURL)
 	r.Get("/ping", shortener.CheckDBConnect)
 	r.Post("/api/shorten/batch", shortener.BatchShortenURLHandler)
+	r.Get("/api/user/urls", shortener.GetAllURLByUserID)
+	r.Delete("/api/user/urls", shortener.DeleteShortenedURLs)
 
 	return r
 }

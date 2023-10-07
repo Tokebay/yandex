@@ -17,8 +17,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const base62Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
 type URLShortener struct {
 	generateIDFunc func() string
 	config         *config.Config
@@ -27,6 +25,10 @@ type URLShortener struct {
 	uuidCounter    int // счетчик UUID
 	uuidMu         sync.Mutex
 	URLDataSlice   []URLData
+	deleteCh       chan struct {
+		UserID int
+		URL    string
+	}
 }
 
 type URLData struct {
@@ -52,14 +54,38 @@ func (us *URLShortener) GenerateUUID() int {
 	return us.uuidCounter
 }
 
+const buffSize = 100
+
 func NewURLShortener(cfg *config.Config, storage storage.URLStorage, fileStorage *Producer) *URLShortener {
+
+	deleteCh := make(chan struct {
+		UserID int
+		URL    string
+	}, buffSize)
+
 	us := &URLShortener{
 		config:      cfg,
 		Storage:     storage,
 		fileStorage: fileStorage,
 		uuidCounter: 0,
+		deleteCh:    deleteCh,
 	}
+
 	return us
+}
+
+func (us *URLShortener) ProcessDeletedURLs() error {
+	fmt.Println("ProcessDeletedURLs")
+	for deleteRequest := range us.deleteCh {
+		// Получил данные из канала для проставления флага удаления
+		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+		err := pgStorage.MarkURLAsDeleted(deleteRequest.UserID, deleteRequest.URL)
+		if err != nil {
+			logger.Log.Error("Error marking URL as deleted", zap.Error(err))
+			return err
+		}
+	}
+	return nil
 }
 
 func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request) {
@@ -81,17 +107,28 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 	id := us.GenerateID()
 	shortenedURL := cfg.BaseURL + "/" + id
 
-	fmt.Printf("Received URL to save: id=%s, url=%s\n", id, string(url))
 	fmt.Printf("DSN %s; fileStorage %s \n", cfg.DSN, cfg.FileStoragePath)
-
 	httpStatusCode := http.StatusCreated
+
 	if cfg.DSN != "" {
-		fmt.Println("Save to DB")
+		userID, err := us.GetNextUserID(w, r)
+		fmt.Printf("shortener. user %d; err %s \n", userID, err)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
-		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
+		fmt.Println("Save to DB")
+		var mURL models.ShortenURL
 
-		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		mURL.ShortURL = cfg.BaseURL + "/" + id
+		mURL.OriginalURL = string(url)
+		mURL.UserID = userID
+
+		fmt.Printf("Received URL to save: id=%s, origURL %s, userID %d \n", mURL.ShortURL, mURL.OriginalURL, mURL.UserID)
+
+		shortURL, err := pgStorage.InsertURL(mURL)
 		if err != nil && shortURL == "" {
 			httpStatusCode = http.StatusConflict
 			shortURL, err = pgStorage.GetShortURL(string(url))
@@ -100,11 +137,8 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 				return
 			}
 		}
-
 		shortenedURL = shortURL
-
 	} else {
-
 		urlData := &URLData{
 			UUID:        us.GenerateUUID(),
 			ShortURL:    shortenedURL,
@@ -123,7 +157,6 @@ func (us *URLShortener) ShortenURLHandler(w http.ResponseWriter, r *http.Request
 			logger.Log.Error("Error saving URL data in file", zap.Error(err))
 			return
 		}
-
 	}
 
 	fmt.Printf("Original URL: %s\n", url)
@@ -161,7 +194,6 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 	if cfg.DSN != "" {
 		shortURL := cfg.BaseURL + r.URL.Path
 
-		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
 		originalURL, err = pgStorage.GetURL(shortURL)
@@ -178,9 +210,13 @@ func (us *URLShortener) RedirectURLHandler(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	// Выполняем перенаправление на оригинальный URL
-	fmt.Printf("select originalURL %s", originalURL)
-	w.Header().Set("Location", originalURL)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	fmt.Printf("RedirectURLHandler. original URL=%s \n", originalURL)
+	if originalURL == "" {
+		w.WriteHeader(http.StatusGone)
+	} else {
+		w.Header().Set("Location", originalURL)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	}
 
 }
 
@@ -202,15 +238,27 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 
 	id := us.GenerateID()
 	cfg := us.config
+
 	shortenedURL := cfg.BaseURL + "/" + id
 
 	httpStatusCode := http.StatusCreated
 	if cfg.DSN != "" {
-		// заполняем структуру ShortenURL для записи в таблицу
-		// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
+		userID, err := us.GetNextUserID(w, r)
+		fmt.Printf("shortener. user %d; err %s \n", userID, err)
+		if err != nil {
+			// w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
 		pgStorage := us.Storage.(*storage.PostgreSQLStorage)
 
-		shortURL, err := pgStorage.InsertURL(shortenedURL, string(url))
+		var mURL models.ShortenURL
+		mURL.OriginalURL = string(url)
+		mURL.ShortURL = shortenedURL
+		mURL.UserID = userID
+
+		shortURL, err := pgStorage.InsertURL(mURL)
 		if err != nil && shortURL == "" {
 			httpStatusCode = http.StatusConflict
 			shortURL, err = pgStorage.GetShortURL(string(url))
@@ -259,6 +307,89 @@ func (us *URLShortener) APIShortenerURL(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (us *URLShortener) GetAllURLByUserID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cfg := us.config
+	if cfg.DSN != "" {
+		userID, err := us.GetNextUserID(w, r)
+		fmt.Printf("GetAllURLByUserID. user %d; err %s \n", userID, err)
+		if err != nil {
+			logger.Log.Error("GetAllURLByUserID. Error GetNextUserID", zap.Error(err))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Получите все URL пользователя из базы данных
+		urls, err := us.GetUserURLs(userID)
+		if err != nil {
+			logger.Log.Error("Error getting user URLs from database", zap.Error(err))
+			return
+		}
+
+		if urls == nil {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(urls)
+		}
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+}
+
+func (us *URLShortener) DeleteShortenedURLs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	go us.ProcessDeletedURLs()
+
+	cfg := us.config
+	hostURL := r.Host
+
+	// Получаю список сокращенных URL из body
+	var urlsToDelete []string
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&urlsToDelete); err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Получаю userID
+	userID, err := us.GetNextUserID(w, r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	fmt.Printf("DeleteShortenedURLs. UserID %d \n", userID)
+
+	if cfg.BaseURL != "" {
+		hostURL = cfg.BaseURL
+	}
+	fmt.Printf("DeleteShortenedURLs. URLs to delete %s \n", urlsToDelete)
+
+	for _, shortURL := range urlsToDelete {
+		fullURL := hostURL + "/" + shortURL
+		// Передаю userID и URL в канал на удаление
+		us.deleteCh <- struct {
+			UserID int
+			URL    string
+		}{
+			UserID: userID,
+			URL:    fullURL,
+		}
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (us *URLShortener) GenerateID() string {
 	// для тестов
 	if us.generateIDFunc != nil {
@@ -277,5 +408,4 @@ func (us *URLShortener) GenerateID() string {
 	}
 
 	return id
-
 }

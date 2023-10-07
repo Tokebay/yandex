@@ -67,6 +67,14 @@ func (s *PostgreSQLStorage) Close() error {
 	return nil
 }
 
+func (s *PostgreSQLStorage) Prepare(query string) (*sql.Stmt, error) {
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	return stmt, nil
+}
+
 func NewPostgreSQLStorage(dsn string) (*PostgreSQLStorage, error) {
 	// Выполнить миграции
 	db, err := goose.OpenDBWithDriver("pgx", dsn)
@@ -97,8 +105,7 @@ func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 		 INSERT INTO shorten_urls (short_url, original_url)
 		 VALUES ($1, $2)
 		 ON CONFLICT (original_url) DO NOTHING
-		 RETURNING short_url
-	 `, shortURL, origURL).Scan(&returnedShortURL)
+		 RETURNING short_url`, shortURL, origURL).Scan(&returnedShortURL)
 
 	if err != nil {
 		if err == pgx.ErrNoRows { // если ON CONFLICT не сработал и ни одна строка не вернулась
@@ -112,16 +119,29 @@ func (s *PostgreSQLStorage) SaveURL(shortURL string, origURL string) error {
 	return nil
 }
 
-func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, error) {
+func (s *PostgreSQLStorage) InsertUser() (int, error) {
+
+	var userID int
+
+	err := s.db.QueryRow(`INSERT INTO users_links DEFAULT VALUES RETURNING user_id`).Scan(&userID)
+
+	if err != nil {
+		logger.Log.Error("Error Insert Users", zap.Error(err))
+		return 0, err
+	}
+
+	return userID, nil
+}
+
+func (s *PostgreSQLStorage) InsertURL(url models.ShortenURL) (string, error) {
 	// ctx := context.Background()
 
 	var existingShortURL string
 
-	err := s.db.QueryRow(`
-	    INSERT INTO shorten_urls (short_url, original_url)
-	    VALUES ($1, $2)
+	err := s.db.QueryRow(`INSERT INTO shorten_urls (short_url, original_url,user_id)
+	    VALUES ($1, $2, $3)
 	    ON CONFLICT (original_url) DO NOTHING
-	    RETURNING short_url`, shortURL, origURL).Scan(&existingShortURL)
+	    RETURNING short_url`, url.ShortURL, url.OriginalURL, url.UserID).Scan(&existingShortURL)
 
 	if err != nil {
 		logger.Log.Error("Error Insert URL to table", zap.Error(err))
@@ -135,7 +155,7 @@ func (s *PostgreSQLStorage) InsertURL(shortURL string, origURL string) (string, 
 func (s *PostgreSQLStorage) GetURL(shortURL string) (string, error) {
 	// ctx := context.Background()
 	var url models.ShortenURL
-	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1", shortURL)
+	row := s.db.QueryRow("SELECT original_url FROM shorten_urls where short_url=$1 and is_deleted != true", shortURL)
 	err := row.Scan(&url.OriginalURL)
 	if err != nil {
 		logger.Log.Error("No row selected from table", zap.Error(err))
@@ -171,4 +191,16 @@ func (s *PostgreSQLStorage) indexExists(indexName string) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+func (s *PostgreSQLStorage) MarkURLAsDeleted(userID int, url string) error {
+	// Обновление записи в базе данных для удаления URL, учитывая userID
+	fmt.Printf("MarkURLAsDeleted userID %d, url %s \n", userID, url)
+	query := "UPDATE shorten_urls SET is_deleted = true WHERE user_id = $1 AND short_url = $2"
+	_, err := s.db.Exec(query, userID, url)
+	if err != nil {
+		logger.Log.Error("error update shorten_urls", zap.Error(err))
+		return err
+	}
+	return nil
 }

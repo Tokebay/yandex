@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/Tokebay/yandex/internal/app/storage"
@@ -9,6 +10,8 @@ import (
 	"github.com/Tokebay/yandex/internal/models"
 	"go.uber.org/zap"
 )
+
+var ErrUserID = errors.New("error occured while getUserID")
 
 func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -28,15 +31,30 @@ func (us *URLShortener) BatchShortenURLHandler(w http.ResponseWriter, r *http.Re
 	var resp models.BatchShortenResponse
 	httpStatusCode := http.StatusCreated
 
+	var userID int
+	if cfg.DSN != "" {
+		userID, ErrUserID = us.GetNextUserID(w, r)
+		if ErrUserID != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+	var mURL models.ShortenURL
+	mURL.UserID = userID
+
 	for _, url := range req {
 		id := us.GenerateID()
 		shortenedURL := cfg.BaseURL + "/" + id
 
 		// fmt.Printf("id %s ; origURL %s;  \n", url.CorrelationID, url.OriginalURL)
 		if cfg.DSN != "" {
+
+			mURL.ShortURL = shortenedURL
+			mURL.OriginalURL = url.OriginalURL
+
 			// pgStorage, err := storage.NewPostgreSQLStorage(cfg.DSN)
 			pgStorage := us.Storage.(*storage.PostgreSQLStorage)
-			shortURL, err := pgStorage.InsertURL(shortenedURL, url.OriginalURL)
+			shortURL, err := pgStorage.InsertURL(mURL)
 			if err != nil && shortURL == "" {
 				httpStatusCode = http.StatusConflict
 				shortURL, err = pgStorage.GetShortURL(url.OriginalURL)
